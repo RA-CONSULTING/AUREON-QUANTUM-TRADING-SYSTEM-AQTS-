@@ -15,7 +15,7 @@ import AureonReportCard from './AureonReportCard';
 import AureonChart from './AureonChart';
 import APIKeyManager from './APIKeyManager';
 import TradeControls from './AureonProcessTree';
-import AutonomousTradingGuide from './AutonomousTradingGuide';
+
 import { runAnalysis, runBacktest } from './lighthouseService';
 import { runGaelicHistoricalSimulation } from './aureonService';
 import { connectWebSocket } from './websocketService';
