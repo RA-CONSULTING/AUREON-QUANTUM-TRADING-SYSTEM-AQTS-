@@ -1,26 +1,27 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import Header from './components/Header';
-import ChartContainer from './components/ChartContainer';
-import CoherenceTrajectoryChart from './components/CoherenceTrajectoryChart';
-import DrivingForcesChart from './components/DrivingForcesChart';
-import SporeConcentrationChart from './components/SporeConcentrationChart';
-import HistoricalCoherenceChart from './components/HistoricalCoherenceChart';
-import ReportCard from './components/ReportCard';
-import ChatPanel from './components/ChatPanel';
-import MonitoringPanel from './components/MonitoringPanel';
-import LiveAnalysisStream from './components/LiveAnalysisStream';
-import TechnologyRoadmap from './components/TechnologyRoadmap';
-import AureonReportCard from './components/AureonReportCard';
-import AureonChart from './components/AureonChart';
-import APIKeyManager from './components/APIKeyManager';
-import TradeControls from './components/AureonProcessTree';
-import { runAnalysis, runBacktest } from './services/lighthouseService';
-import { runGaelicHistoricalSimulation } from './services/aureonService';
-import { connectWebSocket } from './services/websocketService';
-import { streamLiveAnalysis, streamChatResponse, startTranscriptionSession } from './services/geminiService';
+import Header from './Header';
+import ChartContainer from './ChartContainer';
+import CoherenceTrajectoryChart from './CoherenceTrajectoryChart';
+import DrivingForcesChart from './DrivingForcesChart';
+import SporeConcentrationChart from './SporeConcentrationChart';
+import HistoricalCoherenceChart from './HistoricalCoherenceChart';
+import ReportCard from './ReportCard';
+import ChatPanel from './ChatPanel';
+import MonitoringPanel from './MonitoringPanel';
+import LiveAnalysisStream from './LiveAnalysisStream';
+import TechnologyRoadmap from './TechnologyRoadmap';
+import AureonReportCard from './AureonReportCard';
+import AureonChart from './AureonChart';
+import APIKeyManager from './APIKeyManager';
+import TradeControls from './AureonProcessTree';
+import AutonomousTradingGuide from './AutonomousTradingGuide';
+import { runAnalysis, runBacktest } from './lighthouseService';
+import { runGaelicHistoricalSimulation } from './aureonService';
+import { connectWebSocket } from './websocketService';
+import { streamLiveAnalysis, streamChatResponse, startTranscriptionSession } from './geminiService';
 import { NexusAnalysisResult, CoherenceDataPoint, ChatMessage, NexusReport, MonitoringEvent, HistoricalDataPoint, AureonDataPoint, AureonReport, GroundingSource } from './types';
-import TradeNotification from './components/TradeNotification';
+import TradeNotification from './TradeNotification';
 
 const ANALYSIS_UPDATE_THRESHOLD = 20; // Run analysis every 20 data points
 
@@ -395,14 +396,17 @@ const App: React.FC = () => {
             <div className="mt-8 pt-6 border-t border-gray-700">
                  <h2 className="text-2xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-cyan-500 mb-6">System Status & Controls</h2>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <APIKeyManager 
+                  <APIKeyManager
                       isApiActive={isApiActive}
                       onToggleApiStatus={() => setIsApiActive(!isApiActive)}
                   />
-                  <TradeControls 
+                  <TradeControls
                       onExecuteTrade={handleExecuteTrade}
                       isApiActive={isApiActive}
                   />
+                </div>
+                <div className="mt-6">
+                    <AutonomousTradingGuide />
                 </div>
                 <div className="mt-6">
                     <TechnologyRoadmap currentDay={nexusResult?.report.daysSimulated ?? 0} />
