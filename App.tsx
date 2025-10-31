@@ -1,26 +1,27 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import Header from './components/Header';
-import ChartContainer from './components/ChartContainer';
-import CoherenceTrajectoryChart from './components/CoherenceTrajectoryChart';
-import DrivingForcesChart from './components/DrivingForcesChart';
-import SporeConcentrationChart from './components/SporeConcentrationChart';
-import HistoricalCoherenceChart from './components/HistoricalCoherenceChart';
-import ReportCard from './components/ReportCard';
-import ChatPanel from './components/ChatPanel';
-import MonitoringPanel from './components/MonitoringPanel';
-import LiveAnalysisStream from './components/LiveAnalysisStream';
-import TechnologyRoadmap from './components/TechnologyRoadmap';
-import AureonReportCard from './components/AureonReportCard';
-import AureonChart from './components/AureonChart';
-import APIKeyManager from './components/APIKeyManager';
-import TradeControls from './components/AureonProcessTree';
+import Header from './Header';
+import ChartContainer from './ChartContainer';
+import CoherenceTrajectoryChart from './CoherenceTrajectoryChart';
+import DrivingForcesChart from './DrivingForcesChart';
+import SporeConcentrationChart from './SporeConcentrationChart';
+import HistoricalCoherenceChart from './HistoricalCoherenceChart';
+import ReportCard from './ReportCard';
+import ChatPanel from './ChatPanel';
+import MonitoringPanel from './MonitoringPanel';
+import LiveAnalysisStream from './LiveAnalysisStream';
+import TechnologyRoadmap from './TechnologyRoadmap';
+import AureonReportCard from './AureonReportCard';
+import AureonChart from './AureonChart';
+import APIKeyManager from './APIKeyManager';
+import TradeControls from './AureonProcessTree';
 import { runAnalysis, runBacktest } from './services/lighthouseService';
 import { runGaelicHistoricalSimulation } from './services/aureonService';
 import { connectWebSocket } from './services/websocketService';
 import { streamLiveAnalysis, streamChatResponse, startTranscriptionSession } from './services/geminiService';
+import { executeMarketTrade, annotateTradeEventWithExecution } from './services/tradingService';
 import { NexusAnalysisResult, CoherenceDataPoint, ChatMessage, NexusReport, MonitoringEvent, HistoricalDataPoint, AureonDataPoint, AureonReport, GroundingSource } from './types';
-import TradeNotification from './components/TradeNotification';
+import TradeNotification from './TradeNotification';
 
 const ANALYSIS_UPDATE_THRESHOLD = 20; // Run analysis every 20 data points
 
@@ -40,6 +41,7 @@ const App: React.FC = () => {
   const analysisLockRef = useRef<boolean>(false);
   const transcriptionSessionRef = useRef<Awaited<ReturnType<typeof startTranscriptionSession>> | null>(null);
   const webSocketRef = useRef<{ close: () => void } | null>(null);
+  const isApiActiveRef = useRef<boolean>(false);
   
   // Ref to hold all cumulative data from the stream without causing re-renders on every addition
   const dataStreamRef = useRef<{
@@ -147,15 +149,49 @@ const App: React.FC = () => {
 
             // Generate mock trade/signal events
             if (finalReport.aureonReport.prismStatus === 'Red' && Math.random() < 0.25) {
-                const tradeEvent: MonitoringEvent = {
+                const baseEvent: MonitoringEvent = {
                     ts: Date.now(), stage: 'trade_executed', pair: 'ETH/USD',
                     side: Math.random() > 0.5 ? 'LONG' : 'SHORT',
                     size: (Math.random() * 5 + 1).toFixed(2),
                     price: newAureonPoint.market.close.toFixed(2),
                     confidence: newNexusPoint.cognitiveCapacity.toFixed(3)
                 };
-                dataStreamRef.current.monitoring.push(tradeEvent);
-                setLastTrade(tradeEvent);
+
+                let finalTradeEvent: MonitoringEvent = {
+                    ...baseEvent,
+                    executionStatus: 'SIMULATED',
+                    executionMessage: 'API inactive - recorded simulated fill only.',
+                };
+
+                if (isApiActiveRef.current) {
+                    const quantity = parseFloat(baseEvent.size ?? '0');
+                    if (Number.isNaN(quantity) || quantity <= 0) {
+                        finalTradeEvent = {
+                            ...baseEvent,
+                            executionStatus: 'FAILED',
+                            executionMessage: 'Invalid automated trade size produced by simulator.',
+                        };
+                    } else {
+                        try {
+                            const execution = await executeMarketTrade({
+                                pair: baseEvent.pair ?? 'ETH/USDT',
+                                side: baseEvent.side === 'LONG' ? 'BUY' : 'SELL',
+                                quantity,
+                            });
+                            finalTradeEvent = annotateTradeEventWithExecution(baseEvent, execution);
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : 'Unknown error executing automated trade.';
+                            finalTradeEvent = {
+                                ...baseEvent,
+                                executionStatus: 'FAILED',
+                                executionMessage: message,
+                            };
+                        }
+                    }
+                }
+
+                dataStreamRef.current.monitoring.push(finalTradeEvent);
+                setLastTrade(finalTradeEvent);
             } else if (finalReport.aureonReport.prismStatus === 'Gold' && Math.random() < 0.1) {
                 dataStreamRef.current.monitoring.push({
                     ts: Date.now(), stage: 'signal_detected', type: 'Lighthouse Event',
@@ -210,6 +246,10 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    isApiActiveRef.current = isApiActive;
+  }, [isApiActive]);
+
+  useEffect(() => {
     if (lastTrade) {
         const timer = setTimeout(() => setLastTrade(null), 5000);
         return () => clearTimeout(timer);
@@ -224,8 +264,8 @@ const App: React.FC = () => {
     }
   }, [isConnected, connect, disconnect]);
 
-  const handleExecuteTrade = (tradeDetails: { pair: string; side: 'LONG' | 'SHORT'; size: string; price: string }) => {
-    const tradeEvent: MonitoringEvent = {
+  const handleExecuteTrade = useCallback(async (tradeDetails: { pair: string; side: 'LONG' | 'SHORT'; size: string; price: string }) => {
+    const baseEvent: MonitoringEvent = {
         ts: Date.now(),
         stage: 'trade_executed',
         pair: tradeDetails.pair,
@@ -235,16 +275,51 @@ const App: React.FC = () => {
         confidence: 'N/A (Manual)',
         source: 'Manual Override'
     };
-    dataStreamRef.current.monitoring.push(tradeEvent);
-    setLastTrade(tradeEvent);
+
+    let finalEvent: MonitoringEvent = { ...baseEvent, executionStatus: 'SIMULATED', executionMessage: 'API inactive - manual record only.' };
+
+    if (isApiActive) {
+        const quantity = parseFloat(tradeDetails.size);
+        if (Number.isNaN(quantity) || quantity <= 0) {
+            finalEvent = {
+                ...baseEvent,
+                executionStatus: 'FAILED',
+                executionMessage: 'Invalid trade size. Provide a positive number of base units.',
+            };
+            alert('Trade not sent: invalid size.');
+        } else {
+            try {
+                const execution = await executeMarketTrade({
+                    pair: tradeDetails.pair,
+                    side: tradeDetails.side === 'LONG' ? 'BUY' : 'SELL',
+                    quantity,
+                });
+                finalEvent = annotateTradeEventWithExecution(baseEvent, execution);
+                if (!execution.success) {
+                    alert(`Trade failed: ${execution.message}`);
+                }
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Unknown error executing order.';
+                finalEvent = {
+                    ...baseEvent,
+                    executionStatus: 'FAILED',
+                    executionMessage: message,
+                };
+                alert(`Trade failed: ${message}`);
+            }
+        }
+    }
+
+    dataStreamRef.current.monitoring.push(finalEvent);
+    setLastTrade(finalEvent);
     setNexusResult(prev => {
         if (!prev) return null;
         return {
             ...prev,
             monitoringEvents: [...dataStreamRef.current.monitoring]
-        }
+        };
     });
-  };
+  }, [isApiActive]);
 
   const handleToggleRecording = async () => {
     if (isRecording) {

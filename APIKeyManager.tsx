@@ -1,25 +1,32 @@
 
 import React, { useState, useEffect } from 'react';
+import {
+    API_KEY_STORAGE_KEY,
+    API_SECRET_STORAGE_KEY,
+    API_MODE_STORAGE_KEY,
+} from './services/tradingService';
 
 interface APIKeyManagerProps {
   isApiActive: boolean;
   onToggleApiStatus: () => void;
 }
 
-const API_KEY_STORAGE_KEY = 'aureon_api_key';
-const API_SECRET_STORAGE_KEY = 'aureon_api_secret';
-
 const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiStatus }) => {
     const [apiKeyInput, setApiKeyInput] = useState('');
     const [apiSecretInput, setApiSecretInput] = useState('');
     const [keysSaved, setKeysSaved] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [mode, setMode] = useState<'live' | 'testnet'>('testnet');
 
     useEffect(() => {
         const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+        const storedMode = (localStorage.getItem(API_MODE_STORAGE_KEY) as 'live' | 'testnet' | null) ?? null;
         if (storedApiKey) {
             setApiKeyInput(storedApiKey);
             setKeysSaved(true);
+        }
+        if (storedMode) {
+            setMode(storedMode);
         }
     }, []);
 
@@ -30,6 +37,7 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
         }
         localStorage.setItem(API_KEY_STORAGE_KEY, apiKeyInput);
         localStorage.setItem(API_SECRET_STORAGE_KEY, apiSecretInput);
+        localStorage.setItem(API_MODE_STORAGE_KEY, mode);
         setKeysSaved(true);
         setIsEditing(false);
         setApiSecretInput(''); // Clear secret from state for security
@@ -38,8 +46,10 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
 
     const handleEdit = () => {
         const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+        const storedMode = (localStorage.getItem(API_MODE_STORAGE_KEY) as 'live' | 'testnet' | null) ?? 'testnet';
         setApiKeyInput(storedApiKey || '');
         setApiSecretInput(''); // User must re-enter secret
+        setMode(storedMode);
         setIsEditing(true);
     };
     
@@ -47,10 +57,12 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
         if (window.confirm('Are you sure you want to delete the API keys? This action cannot be undone.')) {
             localStorage.removeItem(API_KEY_STORAGE_KEY);
             localStorage.removeItem(API_SECRET_STORAGE_KEY);
+            localStorage.removeItem(API_MODE_STORAGE_KEY);
             setApiKeyInput('');
             setApiSecretInput('');
             setKeysSaved(false);
             setIsEditing(false);
+            setMode('testnet');
             if (isApiActive) {
                 onToggleApiStatus(); // Deactivate if it was active
             }
@@ -60,8 +72,10 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
     const handleCancelEdit = () => {
         setIsEditing(false);
         const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+        const storedMode = (localStorage.getItem(API_MODE_STORAGE_KEY) as 'live' | 'testnet' | null) ?? 'testnet';
         setApiKeyInput(storedApiKey || ''); // Revert any changes
         setApiSecretInput('');
+        setMode(storedMode);
     };
 
     const maskApiKey = (key: string) => {
@@ -70,6 +84,7 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
     };
 
     const effectiveApiStatus = isApiActive && keysSaved;
+    const modeLabel = mode === 'testnet' ? 'TESTNET' : 'LIVE';
 
     return (
         <div className="bg-gray-800/50 border border-gray-700 rounded-lg shadow-lg p-6 h-full flex flex-col">
@@ -82,6 +97,11 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
                     <span className={`text-sm font-bold ${effectiveApiStatus ? 'text-green-400' : 'text-red-400'}`}>
                         {keysSaved ? (effectiveApiStatus ? 'API ACTIVE' : 'API INACTIVE') : 'NO KEY SET'}
                     </span>
+                    {keysSaved && (
+                        <span className="text-xs font-semibold text-sky-300 bg-sky-700/40 border border-sky-500/60 px-2 py-1 rounded">
+                            {modeLabel} MODE
+                        </span>
+                    )}
                     <button
                         role="switch"
                         aria-checked={effectiveApiStatus}
@@ -102,6 +122,9 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
                                 <div className="flex items-center gap-3">
                                     <span className="bg-gray-600 text-gray-200 text-xs font-bold px-2 py-1 rounded">HMAC</span>
                                     <h4 className="text-lg font-semibold text-white">Primary Trading Key</h4>
+                                    <span className="bg-sky-600/30 text-sky-200 text-xs font-bold px-2 py-1 rounded border border-sky-500/60">
+                                        {modeLabel} MODE
+                                    </span>
                                 </div>
                                 <div className="flex items-center gap-4 text-sm font-medium">
                                     <button onClick={handleEdit} className="text-yellow-500 hover:underline">Edit</button>
@@ -117,6 +140,10 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
                                 <div>
                                     <p className="text-xs text-gray-400 mt-2">Secret Key</p>
                                     <p className="font-mono text-gray-300 break-all text-sm">**************************************************</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400 mt-2">Trading Mode</p>
+                                    <p className="text-sm font-semibold text-sky-300">{mode === 'testnet' ? 'Binance Testnet (Paper Trading)' : 'Binance Live Trading'}</p>
                                 </div>
                             </div>
 
@@ -155,6 +182,18 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
                                     placeholder="Enter your secret key"
                                     className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-sky-500 text-gray-200"
                                 />
+                            </div>
+                            <div>
+                                <label htmlFor="api-mode" className="block text-sm font-medium text-gray-400 mb-1">Trading Mode</label>
+                                <select
+                                    id="api-mode"
+                                    value={mode}
+                                    onChange={(e) => setMode(e.target.value as 'live' | 'testnet')}
+                                    className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-sky-500 text-gray-200"
+                                >
+                                    <option value="testnet">Paper Trading (Binance Testnet)</option>
+                                    <option value="live">Live Trading (Binance Production)</option>
+                                </select>
                             </div>
                         </div>
                         <div className="mt-4 flex justify-end gap-3">

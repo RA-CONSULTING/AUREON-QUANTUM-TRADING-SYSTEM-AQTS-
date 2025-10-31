@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 interface TradeControlsProps {
-  onExecuteTrade: (tradeDetails: { pair: string; side: 'LONG' | 'SHORT'; size: string; price: string }) => void;
+  onExecuteTrade: (tradeDetails: { pair: string; side: 'LONG' | 'SHORT'; size: string; price: string }) => Promise<void> | void;
   isApiActive: boolean;
 }
 
@@ -11,12 +11,17 @@ const TradeControls: React.FC<TradeControlsProps> = ({ onExecuteTrade, isApiActi
   const [size, setSize] = useState('1.5');
   const [price, setPrice] = useState('3500.00');
 
-  const handleExecute = () => {
+  const handleExecute = async () => {
     if (!pair || !size || !price) {
       alert('Please fill in all trade details.');
       return;
     }
-    onExecuteTrade({ pair, side, size, price });
+    try {
+      await onExecuteTrade({ pair, side, size, price });
+    } catch (error) {
+      console.error('Trade execution failed:', error);
+      alert('Trade execution failed. Check console for details.');
+    }
   };
 
   return (
