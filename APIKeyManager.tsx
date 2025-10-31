@@ -4,6 +4,7 @@ import {
     API_KEY_STORAGE_KEY,
     API_SECRET_STORAGE_KEY,
     API_MODE_STORAGE_KEY,
+    getStoredCredentials,
 } from './services/tradingService';
 
 interface APIKeyManagerProps {
@@ -17,42 +18,67 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
     const [keysSaved, setKeysSaved] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [mode, setMode] = useState<'live' | 'testnet'>('testnet');
+    const [hasStoredSecret, setHasStoredSecret] = useState(false);
 
     useEffect(() => {
-        const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-        const storedMode = (localStorage.getItem(API_MODE_STORAGE_KEY) as 'live' | 'testnet' | null) ?? null;
-        if (storedApiKey) {
-            setApiKeyInput(storedApiKey);
+        const storedCredentials = getStoredCredentials();
+        if (storedCredentials) {
+            setApiKeyInput(storedCredentials.apiKey);
+            setMode(storedCredentials.mode);
             setKeysSaved(true);
-        }
-        if (storedMode) {
-            setMode(storedMode);
+            setHasStoredSecret(true);
+        } else {
+            const storedMode = (localStorage.getItem(API_MODE_STORAGE_KEY) as 'live' | 'testnet' | null) ?? null;
+            if (storedMode) {
+                setMode(storedMode);
+            }
         }
     }, []);
 
     const handleSave = () => {
-        if (!apiKeyInput.trim() || !apiSecretInput.trim()) {
-            alert('API Key and Secret Key cannot be empty.');
+        const trimmedKey = apiKeyInput.trim();
+        const trimmedSecret = apiSecretInput.trim();
+
+        if (!trimmedKey) {
+            alert('API Key cannot be empty.');
             return;
         }
-        localStorage.setItem(API_KEY_STORAGE_KEY, apiKeyInput);
-        localStorage.setItem(API_SECRET_STORAGE_KEY, apiSecretInput);
+
+        let secretToPersist = trimmedSecret;
+        if (!secretToPersist) {
+            const existingSecret = localStorage.getItem(API_SECRET_STORAGE_KEY);
+            if (!existingSecret) {
+                alert('Secret Key cannot be empty.');
+                return;
+            }
+            secretToPersist = existingSecret;
+        }
+
+        localStorage.setItem(API_KEY_STORAGE_KEY, trimmedKey);
+        localStorage.setItem(API_SECRET_STORAGE_KEY, secretToPersist);
         localStorage.setItem(API_MODE_STORAGE_KEY, mode);
         setKeysSaved(true);
         setIsEditing(false);
         setApiSecretInput(''); // Clear secret from state for security
+        setHasStoredSecret(true);
         alert('API keys saved successfully.');
     };
 
     const handleEdit = () => {
-        const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-        const storedMode = (localStorage.getItem(API_MODE_STORAGE_KEY) as 'live' | 'testnet' | null) ?? 'testnet';
-        setApiKeyInput(storedApiKey || '');
-        setApiSecretInput(''); // User must re-enter secret
-        setMode(storedMode);
+        const storedCredentials = getStoredCredentials();
+        if (storedCredentials) {
+            setApiKeyInput(storedCredentials.apiKey);
+            setMode(storedCredentials.mode);
+            setHasStoredSecret(true);
+        } else {
+            const storedMode = (localStorage.getItem(API_MODE_STORAGE_KEY) as 'live' | 'testnet' | null) ?? 'testnet';
+            setMode(storedMode);
+            setHasStoredSecret(false);
+        }
+        setApiSecretInput(''); // User may re-enter secret; blank retains existing secret on save
         setIsEditing(true);
     };
-    
+
     const handleDelete = () => {
         if (window.confirm('Are you sure you want to delete the API keys? This action cannot be undone.')) {
             localStorage.removeItem(API_KEY_STORAGE_KEY);
@@ -63,6 +89,7 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
             setKeysSaved(false);
             setIsEditing(false);
             setMode('testnet');
+            setHasStoredSecret(false);
             if (isApiActive) {
                 onToggleApiStatus(); // Deactivate if it was active
             }
@@ -71,11 +98,18 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
 
     const handleCancelEdit = () => {
         setIsEditing(false);
-        const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-        const storedMode = (localStorage.getItem(API_MODE_STORAGE_KEY) as 'live' | 'testnet' | null) ?? 'testnet';
-        setApiKeyInput(storedApiKey || ''); // Revert any changes
+        const storedCredentials = getStoredCredentials();
+        if (storedCredentials) {
+            setApiKeyInput(storedCredentials.apiKey);
+            setMode(storedCredentials.mode);
+            setHasStoredSecret(true);
+        } else {
+            const storedMode = (localStorage.getItem(API_MODE_STORAGE_KEY) as 'live' | 'testnet' | null) ?? 'testnet';
+            setApiKeyInput('');
+            setMode(storedMode);
+            setHasStoredSecret(false);
+        }
         setApiSecretInput('');
-        setMode(storedMode);
     };
 
     const maskApiKey = (key: string) => {
@@ -173,7 +207,9 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
                                 />
                             </div>
                             <div>
-                                <label htmlFor="api-secret" className="block text-sm font-medium text-gray-400 mb-1">Secret Key</label>
+                                <label htmlFor="api-secret" className="block text-sm font-medium text-gray-400 mb-1">
+                                    Secret Key {hasStoredSecret && (isEditing || keysSaved) ? '(leave blank to keep existing)' : ''}
+                                </label>
                                 <input
                                     type="password"
                                     id="api-secret"
