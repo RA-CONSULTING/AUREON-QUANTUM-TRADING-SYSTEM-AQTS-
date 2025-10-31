@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 interface TradeControlsProps {
-  onExecuteTrade: (tradeDetails: { pair: string; side: 'LONG' | 'SHORT'; size: string; price: string }) => void;
+  onExecuteTrade: (tradeDetails: { pair: string; side: 'LONG' | 'SHORT'; size: string; price: string }) => Promise<void> | void;
   isApiActive: boolean;
 }
 
@@ -11,12 +11,18 @@ const TradeControls: React.FC<TradeControlsProps> = ({ onExecuteTrade, isApiActi
   const [size, setSize] = useState('1.5');
   const [price, setPrice] = useState('3500.00');
 
-  const handleExecute = () => {
+  const handleExecute = async () => {
     if (!pair || !size || !price) {
       alert('Please fill in all trade details.');
       return;
     }
-    onExecuteTrade({ pair, side, size, price });
+
+    try {
+      await onExecuteTrade({ pair, side, size, price });
+    } catch (error) {
+      console.error('Trade execution failed:', error);
+      alert('Trade execution failed. Check console for details.');
+    }
   };
 
   return (
@@ -24,7 +30,7 @@ const TradeControls: React.FC<TradeControlsProps> = ({ onExecuteTrade, isApiActi
       <div className="flex-grow">
           <h3 className="text-xl font-semibold text-gray-200 mb-1">Layer 5: Manual Trade Execution</h3>
           <p className="text-sm text-gray-400 mb-6">Execute manual orders. Requires active API key.</p>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="pair" className="block text-sm font-medium text-gray-400 mb-1">Pair</label>
@@ -72,7 +78,7 @@ const TradeControls: React.FC<TradeControlsProps> = ({ onExecuteTrade, isApiActi
             </div>
           </div>
       </div>
-      
+
       <button
         onClick={handleExecute}
         disabled={!isApiActive}
@@ -85,3 +91,4 @@ const TradeControls: React.FC<TradeControlsProps> = ({ onExecuteTrade, isApiActi
 };
 
 export default TradeControls;
+
