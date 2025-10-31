@@ -15,6 +15,7 @@ import AureonReportCard from './AureonReportCard';
 import AureonChart from './AureonChart';
 import APIKeyManager from './APIKeyManager';
 import TradeControls from './AureonProcessTree';
+
 import { runAnalysis, runBacktest } from './lighthouseService';
 import { runGaelicHistoricalSimulation } from './aureonService';
 import { connectWebSocket } from './websocketService';
@@ -395,14 +396,17 @@ const App: React.FC = () => {
             <div className="mt-8 pt-6 border-t border-gray-700">
                  <h2 className="text-2xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-cyan-500 mb-6">System Status & Controls</h2>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <APIKeyManager 
+                  <APIKeyManager
                       isApiActive={isApiActive}
                       onToggleApiStatus={() => setIsApiActive(!isApiActive)}
                   />
-                  <TradeControls 
+                  <TradeControls
                       onExecuteTrade={handleExecuteTrade}
                       isApiActive={isApiActive}
                   />
+                </div>
+                <div className="mt-6">
+                    <AutonomousTradingGuide />
                 </div>
                 <div className="mt-6">
                     <TechnologyRoadmap currentDay={nexusResult?.report.daysSimulated ?? 0} />
