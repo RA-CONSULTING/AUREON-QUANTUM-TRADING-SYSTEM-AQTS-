@@ -19,6 +19,28 @@ export interface DecisionSignal {
   sentimentScore: number;
 }
 
+export interface DecisionFusionConfig {
+  buyThreshold: number;
+  sellThreshold: number;
+  weights: {
+    ensemble: number;
+    sentiment: number;
+    qgita: number;
+  };
+  minimumConfidence: number;
+}
+
+const DEFAULT_CONFIG: DecisionFusionConfig = {
+  buyThreshold: 0.15,
+  sellThreshold: -0.15,
+  weights: {
+    ensemble: 0.6,
+    sentiment: 0.2,
+    qgita: 0.2,
+  },
+  minimumConfidence: 0.35,
+};
+
 const generateModelSignal = (model: EnsembleModel, snapshot: DataIngestionSnapshot): ModelSignal => {
   const trend = snapshot.consolidatedOHLCV.close - snapshot.consolidatedOHLCV.open;
   const volatility = snapshot.consolidatedOHLCV.high - snapshot.consolidatedOHLCV.low;
@@ -37,6 +59,16 @@ const generateModelSignal = (model: EnsembleModel, snapshot: DataIngestionSnapsh
 };
 
 export class DecisionFusionLayer {
+  private readonly config: DecisionFusionConfig;
+
+  constructor(config: Partial<DecisionFusionConfig> = {}) {
+    this.config = {
+      ...DEFAULT_CONFIG,
+      ...config,
+      weights: { ...DEFAULT_CONFIG.weights, ...(config.weights ?? {}) },
+    } satisfies DecisionFusionConfig;
+  }
+
   decide(snapshot: DataIngestionSnapshot, lighthouseEvent: LighthouseEvent | null): DecisionSignal {
     const models: EnsembleModel[] = ['lstm', 'randomForest', 'xgboost', 'transformer'];
     const modelSignals = models.map(model => generateModelSignal(model, snapshot));
@@ -48,24 +80,39 @@ export class DecisionFusionLayer {
     const sentimentScore = snapshot.sentiment.reduce((acc, s) => acc + s.score, 0) / snapshot.sentiment.length;
     const qgitaBoost = lighthouseEvent ? lighthouseEvent.confidence * (lighthouseEvent.direction === 'long' ? 1 : -1) : 0;
 
-    const finalScore = normalizedScore * 0.6 + sentimentScore * 0.2 + qgitaBoost * 0.2;
+    const weights = this.config.weights;
+    const weightTotal = weights.ensemble + weights.sentiment + weights.qgita;
+    const normalizedWeights = {
+      ensemble: weights.ensemble / weightTotal,
+      sentiment: weights.sentiment / weightTotal,
+      qgita: weights.qgita / weightTotal,
+    };
+
+    const finalScore =
+      normalizedScore * normalizedWeights.ensemble +
+      sentimentScore * normalizedWeights.sentiment +
+      qgitaBoost * normalizedWeights.qgita;
 
     let action: DecisionAction = 'hold';
-    if (finalScore > 0.15) {
+    if (finalScore > this.config.buyThreshold) {
       action = 'buy';
-    } else if (finalScore < -0.15) {
+    } else if (finalScore < this.config.sellThreshold) {
       action = 'sell';
     }
 
     const baseSize = Math.min(1, Math.abs(finalScore));
     const qgitaConfidence = lighthouseEvent?.confidence ?? 0.4;
+    const combinedConfidence = Math.max(
+      this.config.minimumConfidence,
+      Math.min(1, Math.abs(finalScore) + qgitaConfidence * normalizedWeights.qgita)
+    );
 
     return {
       action,
       positionSize: Number((baseSize * (0.5 + qgitaConfidence)).toFixed(3)),
-      confidence: Math.max(0, Math.min(1, Math.abs(finalScore) + qgitaConfidence * 0.5)),
+      confidence: combinedConfidence,
       modelSignals,
       sentimentScore,
-    };
+    } satisfies DecisionSignal;
   }
 }

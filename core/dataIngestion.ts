@@ -1,11 +1,23 @@
 import { OHLCV } from '../types';
 
+export interface ExchangeConfig {
+  name: string;
+  liquidityWeight: number;
+  latencyMs: number;
+}
+
+export interface DataIngestionConfig {
+  initialPrice: number;
+  exchanges: ExchangeConfig[];
+}
+
 export interface ExchangeFeedSnapshot {
   exchange: string;
   price: number;
   volume24h: number;
   fundingRate: number;
   spread: number;
+  latencyMs: number;
 }
 
 export interface OrderBookLevel {
@@ -49,7 +61,17 @@ export interface DataIngestionSnapshot {
   consolidatedOHLCV: OHLCV;
 }
 
-const EXCHANGES = ['Binance', 'Coinbase', 'Kraken', 'Bybit', 'KuCoin'];
+const DEFAULT_CONFIG: DataIngestionConfig = {
+  initialPrice: 42000,
+  exchanges: [
+    { name: 'Binance', liquidityWeight: 1.0, latencyMs: 25 },
+    { name: 'Coinbase', liquidityWeight: 0.8, latencyMs: 35 },
+    { name: 'Kraken', liquidityWeight: 0.6, latencyMs: 40 },
+    { name: 'Bybit', liquidityWeight: 0.9, latencyMs: 32 },
+    { name: 'KuCoin', liquidityWeight: 0.5, latencyMs: 45 },
+  ],
+};
+
 const KEYWORDS = ['ETF', 'halving', 'regulation', 'bull-run', 'whale', 'leverage'];
 
 const pickKeywords = () => {
@@ -61,9 +83,11 @@ const randomBetween = (min: number, max: number) => min + Math.random() * (max -
 
 export class DataIngestionEngine {
   private price: number;
+  private config: DataIngestionConfig;
 
-  constructor(initialPrice = 42000) {
-    this.price = initialPrice;
+  constructor(config: Partial<DataIngestionConfig> = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config } satisfies DataIngestionConfig;
+    this.price = this.config.initialPrice;
   }
 
   public next(): DataIngestionSnapshot {
@@ -71,13 +95,21 @@ export class DataIngestionEngine {
     const drift = randomBetween(-0.004, 0.006);
     this.price = Math.max(1000, this.price * (1 + drift + volatility * (Math.random() - 0.5)));
 
-    const exchangeFeeds = EXCHANGES.map((exchange, idx) => {
-      const priceNoise = (Math.random() - 0.5) * 0.002 * this.price;
+    const exchangeFeeds = this.config.exchanges.map((exchange, idx) => {
+      const liquidityScale = 1 + exchange.liquidityWeight * 0.5;
+      const priceNoise = (Math.random() - 0.5) * 0.002 * this.price / liquidityScale;
       const price = this.price + priceNoise;
-      const volume24h = randomBetween(50, 500) * 1e6 * (1 + idx * 0.1);
-      const fundingRate = randomBetween(-0.02, 0.02);
+      const volume24h = randomBetween(50, 500) * 1e6 * liquidityScale * (1 + idx * 0.05);
+      const fundingRate = randomBetween(-0.02, 0.02) / liquidityScale;
       const spread = Math.abs(priceNoise) / this.price;
-      return { exchange, price, volume24h, fundingRate, spread } satisfies ExchangeFeedSnapshot;
+      return {
+        exchange: exchange.name,
+        price,
+        volume24h,
+        fundingRate,
+        spread,
+        latencyMs: exchange.latencyMs,
+      } satisfies ExchangeFeedSnapshot;
     });
 
     const bestBid = Math.max(...exchangeFeeds.map(f => f.price)) * (1 - 0.0008);

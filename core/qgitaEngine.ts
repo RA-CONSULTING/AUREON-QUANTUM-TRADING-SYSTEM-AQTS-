@@ -21,7 +21,19 @@ export interface LighthouseEvent {
   breakdown: StageBreakdown;
 }
 
-const FIBONACCI_SEQUENCE = [5, 8, 13, 21, 34, 55];
+export interface QGITAConfig {
+  fibonacciSequence: number[];
+  minConfidence: number;
+  neutralConfidence: number;
+  historyLimit: number;
+}
+
+const DEFAULT_CONFIG: QGITAConfig = {
+  fibonacciSequence: [5, 8, 13, 21, 34, 55],
+  minConfidence: 0.35,
+  neutralConfidence: 0.45,
+  historyLimit: 300,
+};
 
 const computeDiscreteCurvature = (values: number[]): number => {
   if (values.length < 3) return 0;
@@ -42,21 +54,26 @@ const normalize = (value: number, min: number, max: number) => {
 
 export class QGITAEngine {
   private history: DataIngestionSnapshot[] = [];
+  private readonly config: QGITAConfig;
+
+  constructor(config: Partial<QGITAConfig> = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config } satisfies QGITAConfig;
+  }
 
   register(snapshot: DataIngestionSnapshot) {
     this.history.push(snapshot);
-    if (this.history.length > 250) {
+    if (this.history.length > this.config.historyLimit) {
       this.history.shift();
     }
   }
 
   evaluate(): LighthouseEvent | null {
-    if (this.history.length < Math.max(...FIBONACCI_SEQUENCE)) {
+    if (this.history.length < Math.max(...this.config.fibonacciSequence)) {
       return null;
     }
 
     const closes = this.history.map(s => s.consolidatedOHLCV.close);
-    const fibWindows: FibonacciWindow[] = FIBONACCI_SEQUENCE.map(length => {
+    const fibWindows: FibonacciWindow[] = this.config.fibonacciSequence.map(length => {
       const slice = closes.slice(-length);
       const start = slice[0];
       const end = slice[slice.length - 1];
@@ -97,13 +114,13 @@ export class QGITAEngine {
     const meanPrice = closes.slice(-21).reduce((acc, price) => acc + price, 0) / 21;
     let direction: SignalDirection = 'neutral';
 
-    if (confidence > 0.65) {
+    if (confidence > Math.max(this.config.neutralConfidence, this.config.minConfidence + 0.2)) {
       direction = lastClose > meanPrice ? 'long' : 'short';
-    } else if (confidence > 0.45) {
+    } else if (confidence > this.config.neutralConfidence) {
       direction = lastClose > meanPrice ? 'neutral' : 'short';
     }
 
-    if (confidence < 0.35) {
+    if (confidence < this.config.minConfidence) {
       return null;
     }
 
