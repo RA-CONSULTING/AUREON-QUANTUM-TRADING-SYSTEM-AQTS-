@@ -146,6 +146,19 @@ pip install -r requirements-ml.txt
 
 ---
 
+## 🧠 AQTS Automation Toolkit
+
+| Command | Description |
+| --- | --- |
+| `npm run simulate` | Drives the AQTS orchestrator tick-by-tick using `config/config.example.json` (or a custom file supplied via the `AQTS_CONFIG` environment variable). |
+| `npm run backtest` | Executes configurable multi-iteration backtests and prints aggregate win rate, Sharpe ratio, drawdown, and signal confidence. |
+
+Both commands expect a TypeScript runtime such as [`tsx`](https://github.com/esbuild-kit/tsx). Install dependencies before running (`npm install`). Use `AQTS_STEPS` and `AQTS_ITERATIONS` to tailor the horizon and sample size.
+
+For a deep dive into the orchestration layers, configuration schema, deployment patterns, and monitoring practices, see the [AQTS Technical Specification](docs/AQTS_Technical_Specification.md).
+
+---
+
 ## ⚙️ Configuration
 
 `config.yml` controls all bot behavior:

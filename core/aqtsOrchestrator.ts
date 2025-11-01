@@ -1,10 +1,11 @@
 import { AureonDataPoint, CoherenceDataPoint, PrismStatus } from '../types';
 import { DataIngestionEngine, DataIngestionSnapshot } from './dataIngestion';
-import { QGITAEngine, LighthouseEvent } from './qgitaEngine';
 import { DecisionFusionLayer, DecisionSignal } from './decisionFusion';
-import { RiskAdjustedOrder, RiskManager } from './riskManagement';
 import { ExecutionEngine, ExecutionReport } from './executionEngine';
 import { PerformanceSnapshot, PerformanceTracker } from './performanceTracker';
+import { AQTSConfig, DeepPartial, defaultAQTSConfig, mergeConfig } from './config';
+import { LighthouseEvent, QGITAEngine } from './qgitaEngine';
+import { PortfolioState, RiskAdjustedOrder, RiskManager } from './riskManagement';
 
 export interface AQTSOutput {
   snapshot: DataIngestionSnapshot;
@@ -24,14 +25,40 @@ const derivePrismStatus = (confidence: number, spreads: number): PrismStatus => 
 };
 
 export class AQTSOrchestrator {
-  private ingestion = new DataIngestionEngine();
-  private qgita = new QGITAEngine();
-  private decisionLayer = new DecisionFusionLayer();
-  private riskManager = new RiskManager();
-  private execution = new ExecutionEngine();
+  private config: AQTSConfig;
+  private ingestion: DataIngestionEngine;
+  private qgita: QGITAEngine;
+  private decisionLayer: DecisionFusionLayer;
+  private riskManager: RiskManager;
+  private execution: ExecutionEngine;
   private performance = new PerformanceTracker();
   private lastAureon: AureonDataPoint | null = null;
   private time = 0;
+
+  constructor(configOverrides: DeepPartial<AQTSConfig> = {}) {
+    this.config = mergeConfig(defaultAQTSConfig, configOverrides);
+    this.ingestion = new DataIngestionEngine(this.config.ingestion);
+    this.qgita = new QGITAEngine(this.config.qgita);
+    this.decisionLayer = new DecisionFusionLayer(this.config.decision);
+    this.riskManager = new RiskManager(this.config.risk);
+    this.execution = new ExecutionEngine(this.config.execution);
+  }
+
+  reset(configOverrides: DeepPartial<AQTSConfig> = {}) {
+    this.config = mergeConfig(defaultAQTSConfig, configOverrides);
+    this.ingestion = new DataIngestionEngine(this.config.ingestion);
+    this.qgita = new QGITAEngine(this.config.qgita);
+    this.decisionLayer = new DecisionFusionLayer(this.config.decision);
+    this.riskManager = new RiskManager(this.config.risk);
+    this.execution = new ExecutionEngine(this.config.execution);
+    this.performance = new PerformanceTracker();
+    this.lastAureon = null;
+    this.time = 0;
+  }
+
+  getPortfolioState(): PortfolioState {
+    return this.riskManager.getState();
+  }
 
   next(): AQTSOutput {
     const snapshot = this.ingestion.next();
@@ -45,7 +72,7 @@ export class AQTSOrchestrator {
 
     if (order) {
       executionReport = this.execution.execute(order, snapshot);
-      this.riskManager.registerFill(order, executionReport.averagePrice);
+      this.riskManager.registerFill(order, executionReport.averagePrice, this.time);
       performanceSnapshot = this.performance.update(
         executionReport,
         order,
@@ -53,7 +80,7 @@ export class AQTSOrchestrator {
       );
     }
 
-    this.riskManager.markToMarket(snapshot.consolidatedOHLCV.close);
+    this.riskManager.markToMarket(snapshot.consolidatedOHLCV.close, this.time);
 
     const averageSpread = snapshot.exchangeFeeds.reduce((acc, f) => acc + f.spread, 0) / snapshot.exchangeFeeds.length;
     const confidence = lighthouseEvent?.confidence ?? 0.3;
