@@ -36,6 +36,7 @@ The Aureon Quantum Trading Bot is an advanced algorithmic trading system that us
 13. [Support](#-support)
 14. [Disclaimer](#-disclaimer)
 15. [Whats Next](#-whats-next)
+16. [QGITA Whitepaper](#-qgita-whitepaper)
 
 ---
 
@@ -574,5 +575,11 @@ By using this software, you acknowledge and accept all risks associated with cry
 
 ---
 
-Built with 💎 by R&A Consulting and Brokerage Services Ltd  
+## 📑 QGITA Whitepaper
+
+Dive deeper into the theoretical underpinnings of the QGITA detection engine in the [Quantum Gravity in the Act whitepaper](docs/QGITA_Whitepaper.md). The document details the Fibonacci-tightened curvature stage, Lighthouse consensus model, ablation findings, and broader implications for complex signal analysis.
+
+---
+
+Built with 💎 by R&A Consulting and Brokerage Services Ltd
 Belfast, Northern Ireland
