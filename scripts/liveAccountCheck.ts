@@ -47,7 +47,7 @@ async function liveAccountCheck() {
     const account = await client.getAccount();
 
     console.log(`   ✅ Connected successfully!`);
-    console.log(`   Account: ${account.accountType || 'SPOT'}`);
+    console.log(`   Account Type: SPOT`);
     console.log(`   Trading enabled: ${account.canTrade ? '✅ YES' : '❌ NO'}`);
     console.log(`   Can deposit: ${account.canDeposit ? '✅ YES' : '❌ NO'}`);
     console.log(`   Can withdraw: ${account.canWithdraw ? '✅ YES' : '❌ NO'}`);
@@ -66,19 +66,47 @@ async function liveAccountCheck() {
       }
     }
 
-    // Check USDT balance specifically
-    const usdtBalance = account.balances.find((b) => b.asset === 'USDT');
-    const usdtFree = Number(usdtBalance?.free || 0);
+    // Check USDT balance specifically (or base asset if configured)
+    const baseAsset = (process.env.BASE_ASSET || 'USDT').toUpperCase();
+    let usdtFree = 0;
+    let baseBalance = 0;
+    let baseEquiv = 0;
 
-    console.log(`\n5️⃣  USDT Balance Check:`);
-    if (usdtFree === 0) {
-      console.log(`   ⚠️  WARNING: No USDT balance found!`);
-      console.log(`   Action: Transfer USDT to your account to trade`);
-    } else if (usdtFree < 10) {
-      console.log(`   ⚠️  WARNING: Low USDT balance (${usdtFree.toFixed(2)})`);
-      console.log(`   Minimum for trading: £10`);
+    if (baseAsset === 'USDT') {
+      const usdtBalance = account.balances.find((b) => b.asset === 'USDT');
+      usdtFree = Number(usdtBalance?.free || 0);
     } else {
-      console.log(`   ✅ Available: £${usdtFree.toFixed(2)} USDT`);
+      const baseBalRec = account.balances.find((b) => b.asset === baseAsset);
+      baseBalance = Number(baseBalRec?.free || 0);
+      try {
+        const price = await client.getPrice(`${baseAsset}USDT`);
+        baseEquiv = baseBalance * price;
+      } catch {
+        baseEquiv = 0;
+      }
+    }
+
+    console.log(`\n5️⃣  Base Asset Balance Check: (${baseAsset})`);
+    if (baseAsset === 'USDT') {
+      if (usdtFree === 0) {
+        console.log(`   ⚠️  WARNING: No USDT balance found!`);
+        console.log(`   Action: Transfer USDT to your account to trade`);
+      } else if (usdtFree < 10) {
+        console.log(`   ⚠️  WARNING: Low USDT balance (${usdtFree.toFixed(2)})`);
+        console.log(`   Minimum for trading: £10`);
+      } else {
+        console.log(`   ✅ Available: £${usdtFree.toFixed(2)} USDT`);
+      }
+    } else {
+      if (baseBalance === 0) {
+        console.log(`   ⚠️  WARNING: No ${baseAsset} balance found!`);
+        console.log(`   Action: Deposit or convert assets to ${baseAsset} to trade in this mode`);
+      } else if (baseEquiv < 10) {
+        console.log(`   ⚠️  WARNING: ${baseAsset} equivalent too low (£${baseEquiv.toFixed(2)})`);
+        console.log(`   Minimum for trading: £10 USDT-equivalent`);
+      } else {
+        console.log(`   ✅ ${baseAsset} Balance: ${baseBalance} ${baseAsset} (~£${baseEquiv.toFixed(2)} USDT)`);
+      }
     }
 
     // Check symbol prices
@@ -110,8 +138,8 @@ async function liveAccountCheck() {
     let readyToTrade = true;
     const checks = [
       { name: 'Trading enabled', ok: account.canTrade },
-      { name: 'USDT available', ok: usdtFree > 0 },
-      { name: 'USDT > £10', ok: usdtFree >= 10 },
+      { name: `${baseAsset} available`, ok: baseAsset === 'USDT' ? usdtFree > 0 : baseBalance > 0 },
+      { name: `${baseAsset} > £10 (USDT equiv)`, ok: baseAsset === 'USDT' ? usdtFree >= 10 : baseEquiv >= 10 },
       { name: 'API connected', ok: true },
       { name: 'Symbols responding', ok: true },
     ];

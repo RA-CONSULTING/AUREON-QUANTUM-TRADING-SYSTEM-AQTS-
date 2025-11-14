@@ -22,6 +22,9 @@ export interface OrderParams {
   quantity: number;
   price?: number; // required for LIMIT orders
   timeInForce?: 'GTC' | 'IOC' | 'FOK'; // Good Till Cancel, Immediate or Cancel, Fill or Kill
+  // For MARKET orders, Binance allows spending by quote amount instead of base quantity
+  // e.g., for ADAETH, quoteOrderQty is in ETH
+  quoteOrderQty?: number;
 }
 
 export interface OrderResponse {
@@ -172,6 +175,20 @@ export class BinanceClient {
   }
 
   /**
+   * Get exchange info (symbols, filters)
+   */
+  async getExchangeInfo(symbols?: string[]): Promise<any> {
+    const url = symbols && symbols.length
+      ? `${this.baseUrl}/v3/exchangeInfo?symbols=${encodeURIComponent(JSON.stringify(symbols))}`
+      : `${this.baseUrl}/v3/exchangeInfo`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      throw new Error(`Binance API error (${resp.status}): Failed to fetch exchangeInfo`);
+    }
+    return resp.json();
+  }
+
+  /**
    * Place a market or limit order
    */
   async placeOrder(order: OrderParams): Promise<OrderResponse> {
@@ -179,8 +196,14 @@ export class BinanceClient {
       symbol: order.symbol,
       side: order.side,
       type: order.type,
-      quantity: order.quantity,
     };
+
+    // Prefer quoteOrderQty for MARKET orders when provided; otherwise use quantity
+    if (order.type === 'MARKET' && order.quoteOrderQty && order.quoteOrderQty > 0) {
+      params.quoteOrderQty = order.quoteOrderQty;
+    } else if (order.quantity && order.quantity > 0) {
+      params.quantity = order.quantity;
+    }
 
     if (order.type === 'LIMIT') {
       if (!order.price) throw new Error('Price required for LIMIT orders');

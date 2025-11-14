@@ -32,6 +32,7 @@ interface Hive {
   trades: number;
   successRate: number;
   spawned: boolean;
+  harvest?: number;
 }
 
 const TRADE_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'];
