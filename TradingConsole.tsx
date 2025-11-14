@@ -11,6 +11,8 @@ import ChatPanel from './ChatPanel';
 import MonitoringPanel from './MonitoringPanel';
 import LiveAnalysisStream from './LiveAnalysisStream';
 import TechnologyRoadmap from './TechnologyRoadmap';
+import StatusPanel from './StatusPanel';
+import RecentTrades from './RecentTrades';
 import AureonReportCard from './AureonReportCard';
 import AureonChart from './AureonChart';
 import APIKeyManager from './APIKeyManager';
@@ -240,7 +242,7 @@ const TradingConsole: React.FC<TradingConsoleProps> = ({ onBackToLanding }) => {
             return {
                 ...prev,
                 monitoringEvents: [...dataStreamRef.current.monitoring]
-            }
+            };
         });
       }
     });
@@ -429,6 +431,12 @@ const TradingConsole: React.FC<TradingConsoleProps> = ({ onBackToLanding }) => {
       )}
       {lastTrade && <TradeNotification trade={lastTrade} />}
       <Header />
+      <div className="p-3">
+        <StatusPanel />
+      </div>
+      <div className="p-3 pt-0">
+        <RecentTrades />
+      </div>
       <main className="container mx-auto p-4 md:p-6 space-y-6">
         <div className="text-center">
           <button
