@@ -160,7 +160,7 @@ export const hasStoredCredentials = (): boolean => {
 
 
 
-
+  const ivArr = ensureWebCrypto().getRandomValues(new Uint8Array(12));
 
 
 
