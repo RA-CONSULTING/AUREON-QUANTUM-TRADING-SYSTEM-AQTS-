@@ -8,7 +8,7 @@ export type TradeSide = 'BUY' | 'SELL';
 
 export interface StoredCredentials {
   apiKey: string;
-  apiSecret: string;
+  apiSecret: string; // plaintext value, returned by getStoredCredentials after decryption
   mode: 'live' | 'testnet';
 }
 
@@ -113,27 +113,114 @@ export const hasStoredCredentials = (): boolean => {
   return Boolean(apiKey && apiSecret);
 };
 
-export const getStoredCredentials = (): StoredCredentials | null => {
+/**
+ * Gets credentials, decrypting apiSecret.
+ * Requires apiKey to decrypt the apiSecret.
+ * Returns null if no credentials or error in decryption.
+ */
+export const getStoredCredentials = async (apiKeyRequired?: string): Promise<StoredCredentials | null> => {
   if (typeof window === 'undefined') return null;
-
   const apiKey = window.localStorage.getItem(API_KEY_STORAGE_KEY);
-  const apiSecret = window.localStorage.getItem(API_SECRET_STORAGE_KEY);
-  if (!apiKey || !apiSecret) {
+  const encryptedSecret = window.localStorage.getItem(API_SECRET_STORAGE_KEY);
+  const iv = window.localStorage.getItem('aureon_api_secret_iv');
+  if (!apiKey || !encryptedSecret || !iv) return null;
+  let apiSecret: string = '';
+  try {
+    // If apiKeyRequired provided, use that; else fallback on stored key
+    const keyToUse = apiKeyRequired || apiKey;
+    apiSecret = await decryptSecret(encryptedSecret, iv, keyToUse);
+  } catch (e) {
+    console.error('Failed to decrypt API Secret', e);
     return null;
   }
-
   return {
     apiKey,
     apiSecret,
     mode: resolveModeFromStorage(),
   };
-};
+}
 
-export const storeCredentials = (params: StoredCredentials): void => {
+// Helper for array buffer to base64
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  bytes.forEach((b) => binary += String.fromCharCode(b));
+  return window.btoa(binary);
+}
+// Helper for base64 to array buffer
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+// Derive a key from API key (as password)
+async function deriveKeyFromPassword(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await window.crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+  return window.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+// Encrypt the secret using API key; returns base64 encrypted secret and base64 IV
+async function encryptSecret(secret: string, apiKey: string): Promise<{ encrypted: string; iv: string }> {
+  const encoder = new TextEncoder();
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const salt = encoder.encode(apiKey); // simple salt, improve for production usage
+  const key = await deriveKeyFromPassword(apiKey, salt);
+  const encryptedBuffer = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    encoder.encode(secret)
+  );
+  return {
+    encrypted: arrayBufferToBase64(encryptedBuffer),
+    iv: arrayBufferToBase64(iv)
+  };
+}
+// Decrypt the secret using API key and stored IV
+async function decryptSecret(encrypted: string, ivBase64: string, apiKey: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const iv = new Uint8Array(base64ToArrayBuffer(ivBase64));
+  const salt = encoder.encode(apiKey);
+  const key = await deriveKeyFromPassword(apiKey, salt);
+  const decryptedBuffer = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    base64ToArrayBuffer(encrypted)
+  );
+  const decoder = new TextDecoder();
+  return decoder.decode(decryptedBuffer);
+}
+
+/**
+ * Stores credentials, encrypting apiSecret under apiKey before persisting.
+ * Requires being called as an async function.
+ */
+export const storeCredentials = async (params: StoredCredentials): Promise<void> => {
   if (typeof window === 'undefined') return;
-
+  const data = await encryptSecret(params.apiSecret, params.apiKey);
   window.localStorage.setItem(API_KEY_STORAGE_KEY, params.apiKey);
-  window.localStorage.setItem(API_SECRET_STORAGE_KEY, params.apiSecret);
+  window.localStorage.setItem(API_SECRET_STORAGE_KEY, data.encrypted);
+  window.localStorage.setItem('aureon_api_secret_iv', data.iv);
   window.localStorage.setItem(API_MODE_STORAGE_KEY, params.mode);
 };
 

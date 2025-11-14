@@ -19,16 +19,19 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
   const [hasStoredSecret, setHasStoredSecret] = useState(false);
 
   useEffect(() => {
-    const stored = getStoredCredentials();
-    if (stored) {
-      setApiKeyInput(stored.apiKey);
-      setMode(stored.mode);
-      setKeysSaved(true);
-      setHasStoredSecret(Boolean(stored.apiSecret));
+    async function loadStored() {
+      const stored = await getStoredCredentials();
+      if (stored) {
+        setApiKeyInput(stored.apiKey);
+        setMode(stored.mode);
+        setKeysSaved(true);
+        setHasStoredSecret(Boolean(stored.apiSecret));
+      }
     }
+    loadStored();
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmedKey = apiKeyInput.trim();
     const trimmedSecret = apiSecretInput.trim();
 
@@ -39,7 +42,7 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
 
     let secretToPersist = trimmedSecret;
     if (!secretToPersist) {
-      const existing = getStoredCredentials();
+      const existing = await getStoredCredentials(trimmedKey);
       const existingSecret = existing?.apiSecret ?? '';
       if (!existingSecret) {
         alert('Secret Key cannot be empty.');
@@ -48,7 +51,7 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
       secretToPersist = existingSecret;
     }
 
-    storeCredentials({ apiKey: trimmedKey, apiSecret: secretToPersist, mode });
+    await storeCredentials({ apiKey: trimmedKey, apiSecret: secretToPersist, mode });
     setKeysSaved(true);
     setIsEditing(false);
     setApiSecretInput('');
@@ -56,8 +59,8 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
     alert('API keys saved successfully.');
   };
 
-  const handleEdit = () => {
-    const stored = getStoredCredentials();
+  const handleEdit = async () => {
+    const stored = await getStoredCredentials(apiKeyInput.trim());
     if (stored) {
       setApiKeyInput(stored.apiKey);
       setMode(stored.mode);
