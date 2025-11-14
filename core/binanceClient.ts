@@ -138,12 +138,15 @@ export class BinanceClient {
   }
 
   /**
-   * Get current price of a symbol
+   * Get current price of a symbol (public endpoint, no auth required)
    */
   async getPrice(symbol: string): Promise<number> {
-    const data = await this.request<{ symbol: string; price: string }>('GET', '/v3/ticker/price', {
-      symbol,
-    });
+    const url = `${this.baseUrl}/v3/ticker/price?symbol=${symbol}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Binance API error (${response.status}): Failed to fetch price`);
+    }
+    const data = (await response.json()) as { symbol: string; price: string };
     return Number(data.price);
   }
 
