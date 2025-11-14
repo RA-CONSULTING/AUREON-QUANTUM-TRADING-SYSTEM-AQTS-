@@ -68,13 +68,24 @@ const RecentTrades: React.FC<{ symbols?: string } > = ({ symbols = 'ETHUSDT,BTCU
             <div key={sym} className="bg-gray-900/40 rounded p-2">
               <div className="text-gray-300 font-semibold mb-1">{sym}</div>
               <div className="space-y-1 max-h-48 overflow-auto">
-                {(trades[sym] || []).slice().reverse().map((t, idx) => (
-                  <div key={(t.id ?? t.orderId ?? idx)+''} className="flex items-center justify-between">
-                    <div className="text-gray-400">{fmtTime(t.time)}</div>
-                    <div className="text-gray-200 font-mono">{Number(t.price).toFixed(6)}</div>
-                    <div className="text-gray-400 font-mono">{t.qty ? Number(t.qty).toFixed(6) : ''}</div>
-                  </div>
-                ))}
+                {(() => {
+                  const arr = (trades[sym] || []).slice().reverse();
+                  return arr.map((t, idx) => {
+                    const prev = idx > 0 ? arr[idx-1] : undefined;
+                    const pNow = Number(t.price);
+                    const pPrev = prev ? Number(prev.price) : undefined;
+                    const ch = pPrev ? (pNow - pPrev) / pPrev : 0;
+                    const color = ch > 0 ? 'text-green-400' : ch < 0 ? 'text-red-400' : 'text-gray-400';
+                    return (
+                      <div key={(t.id ?? t.orderId ?? idx)+''} className="flex items-center justify-between gap-2">
+                        <div className="text-gray-400">{fmtTime(t.time)}</div>
+                        <div className="text-gray-200 font-mono">{pNow.toFixed(6)}</div>
+                        <div className={`font-mono ${color}`}>{pPrev ? `${(ch*100).toFixed(2)}%` : ''}</div>
+                        <div className="text-gray-400 font-mono">{t.qty ? Number(t.qty).toFixed(6) : ''}</div>
+                      </div>
+                    );
+                  })
+                })()}
               </div>
             </div>
           ))}
