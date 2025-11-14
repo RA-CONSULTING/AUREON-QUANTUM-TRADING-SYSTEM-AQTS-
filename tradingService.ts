@@ -138,7 +138,7 @@ export const getStoredCredentials = async (apiKeyRequired?: string): Promise<Sto
     apiSecret,
     mode: resolveModeFromStorage(),
   };
-}
+};
 
 // Helper for array buffer to base64
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
