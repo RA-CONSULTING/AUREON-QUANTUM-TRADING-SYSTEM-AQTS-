@@ -25,52 +25,79 @@ const StatusPanel: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showThresholdAlert, setShowThresholdAlert] = useState<boolean>(false);
   const [eligiblePrev, setEligiblePrev] = useState<boolean | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    try {
+      return (localStorage.getItem('statusPanel:sound') ?? 'on') !== 'off';
+    } catch { return true; }
+  });
 
-  const playBeep = () => {
+  useEffect(() => {
+    try { localStorage.setItem('statusPanel:sound', soundEnabled ? 'on' : 'off'); } catch {}
+  }, [soundEnabled]);
+
+  const playBeep = async () => {
     try {
       const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
       if (!Ctx) return;
       const ctx = new Ctx();
+      if (ctx.state === 'suspended') {
+        try { await ctx.resume(); } catch {}
+      }
       const o = ctx.createOscillator();
       const g = ctx.createGain();
       o.type = 'sine';
       o.frequency.value = 880;
       o.connect(g);
-        {bots.length === 0 ? (
-          <div className="text-gray-400 text-sm">No bots reporting yet.</div>
-        ) : (
-          <div className="space-y-4 max-h-80 overflow-auto">
-            {bots.map((b) => {
-              const status = inferBotStatus(b.tail || []);
-              return (
-                <div key={b.name} className="bg-black/30 rounded border border-gray-800">
-                  <div className="px-3 py-2 border-b border-gray-800 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs ${status.color}`}>●</span>
-                      <div className="text-white font-medium">{b.name}</div>
-                      <div className="text-xs text-gray-400">{status.label}</div>
-                    </div>
-                    <div className="text-xs text-gray-500">latest 20 lines</div>
-                  </div>
-                  <pre className="text-xs text-gray-300 p-3 whitespace-pre-wrap leading-relaxed">{b.tail.join('\n')}</pre>
-                </div>
-              );
-            })}
-          </div>
-        )}
+      g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.06, ctx.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
+      o.start();
+      o.stop(ctx.currentTime + 0.26);
     } catch {}
   };
 
   const inferBotStatus = (tail: string[]): { label: string; color: string } => {
     const text = tail.join('\n').toLowerCase();
     if (!text) return { label: 'idle', color: 'text-gray-400' };
-    if (text.includes('waiting for funds') || text.includes('waiting for eth') || text.includes('waiting for')) {
+    if (
+      text.includes('waiting for funds') ||
+      text.includes('waiting for eth') ||
+      text.includes('awaiting funding') ||
+      text.includes('insufficient funds') ||
+      text.includes('min notional') ||
+      text.includes('min_notional') ||
+      text.includes('minnotional') ||
+      text.includes('balance too low') ||
+      text.includes('waiting for')
+    ) {
       return { label: 'waiting', color: 'text-amber-300' };
     }
-    if (text.includes('simulate buy') || text.includes('simulate sell') || text.includes('dry_run')) {
+    if (
+      text.includes('simulate buy') ||
+      text.includes('simulate sell') ||
+      text.includes('dry_run') ||
+      text.includes('dry-run') ||
+      text.includes('dry run') ||
+      text.includes('paper') ||
+      text.includes('would place') ||
+      text.includes('simulat')
+    ) {
       return { label: 'simulating', color: 'text-sky-300' };
     }
-    if (text.includes('✅') || text.includes('bought') || text.includes('sold') || text.includes('real trade')) {
+    if (
+      text.includes('✅') ||
+      text.includes('bought') ||
+      text.includes('sold') ||
+      text.includes('real trade') ||
+      text.includes('placed order') ||
+      text.includes('placing order') ||
+      text.includes('orderid') ||
+      text.includes('executed') ||
+      text.includes('filled') ||
+      text.includes('market buy') ||
+      text.includes('market sell')
+    ) {
       return { label: 'active', color: 'text-green-400' };
     }
     return { label: 'running', color: 'text-gray-300' };
@@ -96,7 +123,7 @@ const StatusPanel: React.FC = () => {
           setShowThresholdAlert(true);
           setEligiblePrev(true);
           setTimeout(() => setShowThresholdAlert(false), 10000);
-          playBeep();
+          if (soundEnabled) playBeep();
         } else if (!eligible && eligiblePrev === true) {
           setEligiblePrev(false);
         }
@@ -114,9 +141,27 @@ const StatusPanel: React.FC = () => {
     <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 mb-3">
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-gray-200 font-semibold">Live Status</h4>
-        {balance && (
-          <span className="text-xs text-gray-400">ETHUSDT ${balance.ethUsdt.toFixed(2)}</span>
-        )}
+        <div className="flex items-center gap-3">
+          {balance && (
+            <span className="text-xs text-gray-400">ETHUSDT ${balance.ethUsdt.toFixed(2)}</span>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              className={`text-xs px-2 py-1 rounded border ${soundEnabled ? 'border-green-500 text-green-300' : 'border-gray-600 text-gray-300'}`}
+              onClick={() => setSoundEnabled((v) => !v)}
+              title="Toggle threshold alert sound"
+            >
+              Sound: {soundEnabled ? 'ON' : 'OFF'}
+            </button>
+            <button
+              className="text-xs px-2 py-1 rounded border border-gray-600 text-gray-300"
+              onClick={() => { if (soundEnabled) playBeep(); }}
+              title="Play test tone"
+            >
+              Test
+            </button>
+          </div>
+        </div>
       </div>
       {error && <div className="text-red-400 text-xs mb-2">{error}</div>}
       {showThresholdAlert && (
@@ -147,13 +192,33 @@ const StatusPanel: React.FC = () => {
         <div className="text-xs text-gray-400">Loading status…</div>
       )}
 
-      <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
-        {bots.map((b) => (
-          <div key={b.name} className="bg-gray-900/40 rounded p-2">
-            <div className="text-gray-300 font-semibold mb-1">{b.name}</div>
-            <pre className="text-gray-400 whitespace-pre-wrap leading-tight max-h-32 overflow-auto">{b.tail.join('\n') || 'No logs yet.'}</pre>
+      <div className="bg-gray-900/60 p-4 rounded-lg border border-gray-700 mt-3">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-white">Bots</h3>
+          <span className="text-xs text-gray-400">log tails</span>
+        </div>
+        {bots.length === 0 ? (
+          <div className="text-gray-400 text-xs">No bots reporting yet.</div>
+        ) : (
+          <div className="space-y-3 max-h-80 overflow-auto">
+            {bots.map((b) => {
+              const status = inferBotStatus(b.tail || []);
+              return (
+                <div key={b.name} className="bg-black/30 rounded border border-gray-800">
+                  <div className="px-3 py-2 border-b border-gray-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs ${status.color}`}>●</span>
+                      <div className="text-white font-medium">{b.name}</div>
+                      <div className="text-xs text-gray-400">{status.label}</div>
+                    </div>
+                    <div className="text-xs text-gray-500">latest 20 lines</div>
+                  </div>
+                  <pre className="text-xs text-gray-300 p-3 whitespace-pre-wrap leading-relaxed">{(b.tail || []).join('\n')}</pre>
+                </div>
+              );
+            })}
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
