@@ -120,3 +120,56 @@ export const hasStoredCredentials = (): boolean => {
   return Boolean(apiKey && apiSecret);
 };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  const crypto = ensureWebCrypto();
+  const keyMaterial = await crypto.subtle.importKey(
+
+
+  return await crypto.subtle.deriveKey(
