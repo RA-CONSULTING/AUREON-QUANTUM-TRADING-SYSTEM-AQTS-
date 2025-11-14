@@ -12,6 +12,13 @@ export interface StoredCredentials {
   mode: 'live' | 'testnet';
 }
 
+// Helper interface for encrypted storage
+export interface EncryptedCredentials {
+  apiKeyEnc: string;
+  apiSecretEnc: string;
+  mode: 'live' | 'testnet';
+}
+
 export interface TradeRequest {
   pair: string;
   side: TradeSide;
@@ -113,27 +120,106 @@ export const hasStoredCredentials = (): boolean => {
   return Boolean(apiKey && apiSecret);
 };
 
-export const getStoredCredentials = (): StoredCredentials | null => {
+export const getStoredCredentials = async (password: string): Promise<StoredCredentials | null> => {
   if (typeof window === 'undefined') return null;
 
-  const apiKey = window.localStorage.getItem(API_KEY_STORAGE_KEY);
-  const apiSecret = window.localStorage.getItem(API_SECRET_STORAGE_KEY);
-  if (!apiKey || !apiSecret) {
+  const apiKeyEnc = window.localStorage.getItem(API_KEY_STORAGE_KEY);
+  const apiSecretEnc = window.localStorage.getItem(API_SECRET_STORAGE_KEY);
+  if (!apiKeyEnc || !apiSecretEnc) {
     return null;
   }
-
-  return {
-    apiKey,
-    apiSecret,
-    mode: resolveModeFromStorage(),
-  };
+  // Decrypt
+  try {
+    const apiKey = await decryptString(apiKeyEnc, password);
+    const apiSecret = await decryptString(apiSecretEnc, password);
+    return {
+      apiKey,
+      apiSecret,
+      mode: resolveModeFromStorage(),
+    };
+  } catch (e) {
+    // Failed decryption, probably bad password
+    return null;
+  }
 };
 
-export const storeCredentials = (params: StoredCredentials): void => {
-  if (typeof window === 'undefined') return;
 
-  window.localStorage.setItem(API_KEY_STORAGE_KEY, params.apiKey);
-  window.localStorage.setItem(API_SECRET_STORAGE_KEY, params.apiSecret);
+// --- AES-GCM helpers ---
+const ENCRYPTION_SALT_KEY = 'aureon_encryption_salt';
+const ENCRYPTION_IV_KEY = 'aureon_encryption_iv';
+
+// Get or create a random salt for key derivation
+const getEncryptionSalt = (): Uint8Array => {
+  let salt = window.localStorage.getItem(ENCRYPTION_SALT_KEY);
+  if (salt) return new Uint8Array(JSON.parse(salt));
+  const saltArr = window.crypto.getRandomValues(new Uint8Array(16));
+  window.localStorage.setItem(ENCRYPTION_SALT_KEY, JSON.stringify(Array.from(saltArr)));
+  return saltArr;
+};
+
+const getIV = (): Uint8Array => {
+  let iv = window.localStorage.getItem(ENCRYPTION_IV_KEY);
+  if (iv) return new Uint8Array(JSON.parse(iv));
+  const ivArr = window.crypto.getRandomValues(new Uint8Array(12));
+  window.localStorage.setItem(ENCRYPTION_IV_KEY, JSON.stringify(Array.from(ivArr)));
+  return ivArr;
+};
+
+// Derive an AES-GCM CryptoKey from the password
+const deriveKey = async (password: string, salt: Uint8Array): Promise<CryptoKey> => {
+  const enc = new TextEncoder();
+  const keyMaterial = await window.crypto.subtle.importKey(
+    "raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]
+  );
+  return await window.crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+};
+
+const encryptString = async (plain: string, password: string): Promise<string> => {
+  const salt = getEncryptionSalt();
+  const iv = getIV();
+  const key = await deriveKey(password, salt);
+  const enc = new TextEncoder();
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    enc.encode(plain)
+  );
+  return Buffer.from(encrypted).toString('base64');
+};
+
+const decryptString = async (cipherText: string, password: string): Promise<string> => {
+  const salt = getEncryptionSalt();
+  const iv = getIV();
+  const key = await deriveKey(password, salt);
+  const encryptedBytes = Buffer.from(cipherText, 'base64');
+  const decrypted = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    encryptedBytes
+  );
+  return new TextDecoder().decode(decrypted);
+};
+
+// --- Secure credential store ---
+export const storeCredentials = async (params: StoredCredentials, password: string): Promise<void> => {
+  if (typeof window === 'undefined') return;
+  // Encrypt values
+  const apiKeyEnc = await encryptString(params.apiKey, password);
+  const apiSecretEnc = await encryptString(params.apiSecret, password);
+
+  window.localStorage.setItem(API_KEY_STORAGE_KEY, apiKeyEnc);
+  window.localStorage.setItem(API_SECRET_STORAGE_KEY, apiSecretEnc);
   window.localStorage.setItem(API_MODE_STORAGE_KEY, params.mode);
 };
 
