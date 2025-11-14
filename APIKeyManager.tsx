@@ -19,16 +19,14 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
   const [hasStoredSecret, setHasStoredSecret] = useState(false);
 
   useEffect(() => {
-    async function loadStored() {
-      const stored = await getStoredCredentials();
+
       if (stored) {
         setApiKeyInput(stored.apiKey);
         setMode(stored.mode);
         setKeysSaved(true);
         setHasStoredSecret(Boolean(stored.apiSecret));
       }
-    }
-    loadStored();
+
   }, []);
 
   const handleSave = async () => {
@@ -39,10 +37,16 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
       alert('API Key cannot be empty.');
       return;
     }
+    // PROMPT user for their password
+    const pwd = window.prompt('Enter storage password for credentials:', '');
+    if (!pwd) {
+      alert('Password is required to store credentials securely.');
+      return;
+    }
 
     let secretToPersist = trimmedSecret;
     if (!secretToPersist) {
-      const existing = await getStoredCredentials(trimmedKey);
+
       const existingSecret = existing?.apiSecret ?? '';
       if (!existingSecret) {
         alert('Secret Key cannot be empty.');
@@ -51,7 +55,7 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
       secretToPersist = existingSecret;
     }
 
-    await storeCredentials({ apiKey: trimmedKey, apiSecret: secretToPersist, mode });
+
     setKeysSaved(true);
     setIsEditing(false);
     setApiSecretInput('');
@@ -60,7 +64,7 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
   };
 
   const handleEdit = async () => {
-    const stored = await getStoredCredentials(apiKeyInput.trim());
+
     if (stored) {
       setApiKeyInput(stored.apiKey);
       setMode(stored.mode);
