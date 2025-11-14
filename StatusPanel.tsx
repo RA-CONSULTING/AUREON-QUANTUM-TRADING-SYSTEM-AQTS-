@@ -26,6 +26,56 @@ const StatusPanel: React.FC = () => {
   const [showThresholdAlert, setShowThresholdAlert] = useState<boolean>(false);
   const [eligiblePrev, setEligiblePrev] = useState<boolean | null>(null);
 
+  const playBeep = () => {
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = 880;
+      o.connect(g);
+        {bots.length === 0 ? (
+          <div className="text-gray-400 text-sm">No bots reporting yet.</div>
+        ) : (
+          <div className="space-y-4 max-h-80 overflow-auto">
+            {bots.map((b) => {
+              const status = inferBotStatus(b.tail || []);
+              return (
+                <div key={b.name} className="bg-black/30 rounded border border-gray-800">
+                  <div className="px-3 py-2 border-b border-gray-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs ${status.color}`}>●</span>
+                      <div className="text-white font-medium">{b.name}</div>
+                      <div className="text-xs text-gray-400">{status.label}</div>
+                    </div>
+                    <div className="text-xs text-gray-500">latest 20 lines</div>
+                  </div>
+                  <pre className="text-xs text-gray-300 p-3 whitespace-pre-wrap leading-relaxed">{b.tail.join('\n')}</pre>
+                </div>
+              );
+            })}
+          </div>
+        )}
+    } catch {}
+  };
+
+  const inferBotStatus = (tail: string[]): { label: string; color: string } => {
+    const text = tail.join('\n').toLowerCase();
+    if (!text) return { label: 'idle', color: 'text-gray-400' };
+    if (text.includes('waiting for funds') || text.includes('waiting for eth') || text.includes('waiting for')) {
+      return { label: 'waiting', color: 'text-amber-300' };
+    }
+    if (text.includes('simulate buy') || text.includes('simulate sell') || text.includes('dry_run')) {
+      return { label: 'simulating', color: 'text-sky-300' };
+    }
+    if (text.includes('✅') || text.includes('bought') || text.includes('sold') || text.includes('real trade')) {
+      return { label: 'active', color: 'text-green-400' };
+    }
+    return { label: 'running', color: 'text-gray-300' };
+  };
+
   useEffect(() => {
     let mounted = true;
     const tick = async () => {
@@ -46,6 +96,7 @@ const StatusPanel: React.FC = () => {
           setShowThresholdAlert(true);
           setEligiblePrev(true);
           setTimeout(() => setShowThresholdAlert(false), 10000);
+          playBeep();
         } else if (!eligible && eligiblePrev === true) {
           setEligiblePrev(false);
         }
