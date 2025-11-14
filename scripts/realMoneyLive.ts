@@ -15,7 +15,7 @@ import { log } from '../core/environment';
 
 const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'DOGEUSDT'];
 const AGENT_TRADE_INTERVAL = 500; // milliseconds between trades per agent
-const RISK_PERCENT_PER_TRADE = 0.5; // 0.5% risk per trade
+const RISK_PERCENT_PER_TRADE = 10; // 10% risk per trade (more aggressive to meet minimums)
 
 interface Position {
   symbol: string;
@@ -54,6 +54,9 @@ class LiveMoneyQueenHive {
   private nextHiveId = 0;
   private nextAgentId = 0;
   private accountBalance = 0;
+  private baseAsset = 'USDT';
+  private baseAssetBalance = 0;
+  private tradingSymbols: string[] = SYMBOLS.slice();
   private tradingPaused = false;
   private maxDailyTrades = 0;
   private dailyTradeCount = 0;
@@ -107,9 +110,31 @@ Current safety settings:
       console.log(`   Trading enabled: ${account.canTrade}`);
       console.log(`   Margin enabled: ${account.canDeposit && account.canWithdraw}`);
 
-      // Get USDT balance
-      const usdtBalance = account.balances.find((b) => b.asset === 'USDT');
-      this.accountBalance = Number(usdtBalance?.free || 0);
+      // Determine base asset (default USDT) and compute capital
+      this.baseAsset = (process.env.BASE_ASSET || 'USDT').toUpperCase();
+
+      if (this.baseAsset === 'USDT') {
+        // use default USDT quoted symbols
+        const usdtBalance = account.balances.find((b) => b.asset === 'USDT');
+        this.accountBalance = Number(usdtBalance?.free || 0);
+        this.baseAssetBalance = this.accountBalance;
+        console.log(`💱 Base asset: USDT (Balance: £${this.accountBalance.toFixed(2)})`);
+        this.tradingSymbols = SYMBOLS.slice();
+      } else {
+        // Base asset (e.g. ETH) - compute USDT equivalent for capital sizing
+        const baseBal = Number(account.balances.find((b) => b.asset === this.baseAsset)?.free || 0);
+        this.baseAssetBalance = baseBal;
+        const basePriceSymbol = `${this.baseAsset}USDT`;
+        const basePrice = await this.client!.getPrice(basePriceSymbol).catch(() => 0);
+        const usdtEquivalent = baseBal * basePrice;
+        this.accountBalance = Number(usdtEquivalent || 0);
+        console.log(`💱 Base asset: ${this.baseAsset} (Balance: ${baseBal} ${this.baseAsset} ≈ £${this.accountBalance.toFixed(2)} USDT)`);
+        console.log(`🔁 NOTE: Using ${this.baseAsset} as capital — if you wish to trade USDT pairs you must convert ${this.baseAsset} to USDT first.`);
+        // generate symbols quoted in the base asset, e.g. BTCETH, ADAETH
+        this.tradingSymbols = SYMBOLS
+          .map((s) => s.replace('USDT', this.baseAsset))
+          .filter((s) => !s.includes(this.baseAsset + this.baseAsset));
+      }
 
       if (this.accountBalance < 10) {
         throw new Error(`❌ Insufficient balance: £${this.accountBalance}. Minimum: £10`);
@@ -168,17 +193,35 @@ Current safety settings:
         `📍 [${symbol}] ${side} ${quantity} @ £${adjustedPrice.toFixed(4)} (£${(quantity * adjustedPrice).toFixed(2)} value)`
       );
 
-      // In production, this would call:
-      // const order = await this.client!.placeOrder(symbol, side, quantity, adjustedPrice);
-      // For now, simulate successful order
-      const orderId = `ORDER-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      // REAL ORDER EXECUTION - placing actual trades on live Binance
+      console.log(`🔥 [REAL TRADE] Placing MARKET order on Binance for ${symbol}...`);
+      console.log(`   Side: ${side}, Quantity: ${quantity.toFixed(8)}`);
+      
+      try {
+        // Use MARKET orders for immediate execution (simpler than LIMIT)
+        const order = await this.client!.placeOrder({
+          symbol,
+          side,
+          type: 'MARKET',
+          quantity: Number(quantity.toFixed(8)), // Round to 8 decimals
+        });
 
-      this.dailyTradeCount++;
+        this.dailyTradeCount++;
+        console.log(`✅ [REAL TRADE SUCCESS] Order ${order.orderId} executed!`);
+        console.log(`   Status: ${order.status}, Filled: ${order.executedQty} @ avg ${order.price}`);
 
-      return {
-        orderId,
-        status: 'PLACED',
-      };
+        return {
+          orderId: String(order.orderId),
+          status: order.status,
+        };
+      } catch (err: any) {
+        const errorMsg = err.message || JSON.stringify(err);
+        console.log(`❌ [REAL TRADE FAILED] ${symbol} ${side} ${quantity}: ${errorMsg}`);
+        log('error', `❌ Live order failed for ${symbol}`, err);
+        
+        // Continue despite error (don't crash the whole system)
+        return null;
+      }
     } catch (err) {
       log('error', `❌ Order failed for ${symbol}`, err);
       return null;
@@ -224,18 +267,52 @@ Current safety settings:
   async executeAgentTrade(agent: Agent, hive: Hive): Promise<void> {
     try {
       // Random symbol selection
-      const symbol = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+      // choose from tradingSymbols to ensure quotes align with base asset
+      const symbol = this.tradingSymbols[Math.floor(Math.random() * this.tradingSymbols.length)];
 
       // Get current price
       const price = await this.fetchLivePrice(symbol);
       if (price === 0) return;
 
-      // Calculate position size based on risk
-      const riskAmount = agent.balance * (RISK_PERCENT_PER_TRADE / 100);
-      const quantity = riskAmount / price;
+      // Calculate position size based on risk (agent.balance is denominated in USDT-equivalent)
+      const riskAmountUSDT = agent.balance * (RISK_PERCENT_PER_TRADE / 100);
+      let quantity = 0;
 
+      if (this.baseAsset === 'USDT') {
+        // price is quoted in USDT (e.g., BTCUSDT). quantity = USDT risk / price (USDT per asset)
+        quantity = riskAmountUSDT / price;
+      } else {
+        // price is quoted in baseAsset (e.g., ADAETH). Convert USDT risk to base asset, then to asset qty
+        const baseAssetPriceUSDT = await this.fetchLivePrice(`${this.baseAsset}USDT`);
+        if (baseAssetPriceUSDT === 0) return;
+        const riskAmountInBase = riskAmountUSDT / baseAssetPriceUSDT; // how much base asset (ETH) we risk
+        quantity = riskAmountInBase / price; // price is baseAsset per asset
+      }
+
+      // Minimum order values for Binance (in USDT equivalent or base asset)
+      const MIN_ORDER_VALUE_USDT = 10; // Binance minimum is ~$10
+      
       if (quantity < 0.001) {
-        return; // Too small for Binance minimum
+        console.log(`⏭️  Skipping ${symbol}: quantity ${quantity.toFixed(8)} too small (min 0.001)`);
+        return;
+      }
+      
+      // Check minimum order value
+      if (this.baseAsset === 'USDT') {
+        const orderValueUSDT = quantity * price;
+        if (orderValueUSDT < MIN_ORDER_VALUE_USDT) {
+          console.log(`⏭️  Skipping ${symbol}: order value $${orderValueUSDT.toFixed(2)} < minimum $${MIN_ORDER_VALUE_USDT}`);
+          return;
+        }
+      } else if (this.baseAsset === 'ETH') {
+        const orderValueETH = quantity * price;
+        const ethPriceUSDT = await this.fetchLivePrice('ETHUSDT');
+        const orderValueUSDT = orderValueETH * ethPriceUSDT;
+        
+        if (orderValueUSDT < MIN_ORDER_VALUE_USDT) {
+          console.log(`⏭️  Skipping ${symbol}: order value $${orderValueUSDT.toFixed(2)} < minimum $${MIN_ORDER_VALUE_USDT}`);
+          return;
+        }
       }
 
       // Decide side (60% BUY, 40% SELL for uptrend)

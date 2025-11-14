@@ -242,6 +242,13 @@ export class BinanceClient {
   }
 
   /**
+   * Get account trade list for a symbol (requires auth)
+   */
+  async getMyTrades(symbol: string, limit: number = 20): Promise<Array<any>> {
+    return this.request<Array<any>>('GET', '/v3/myTrades', { symbol, limit });
+  }
+
+  /**
    * Subscribe to real-time price updates via WebSocket
    * Returns a subscription handle that can be closed
    */
