@@ -1,5 +1,5 @@
 
-import { CoherenceDataPoint, DejaVuEvent, HistoricalDataPoint, NexusAnalysisResult } from '../types';
+import { CoherenceDataPoint, DejaVuEvent, HistoricalDataPoint, NexusAnalysisResult } from './types';
 
 const PATTERN_LENGTH = 4;
 const SIMILARITY_THRESHOLD = 0.005; // Sum of squared differences for a pattern match

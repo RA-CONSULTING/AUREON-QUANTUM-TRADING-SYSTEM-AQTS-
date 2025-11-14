@@ -1,15 +1,3 @@
-{
-  "params": {
-    "NUM_AGENTS": 100,
-    "START_PER_AGENT": 100,
-    "MAX_GLOBAL_TRADES": 500000
-  },
-  "successRate": 0,
-  "totalAgents": 100,
-  "successfulAgents": 0,
-  "totalTrades": 50000000,
-  "medianTradesToTarget": null,
-  "successTimes": [],
-  "avgFinalEquity": 1168.3115507560187,
-  "totalAggregateEquity": 116831.15507560188
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:defe9f9a5ebf6d570f47af0595d823c020d9c37232b78564b13db34a0f90d5e7
+size 338

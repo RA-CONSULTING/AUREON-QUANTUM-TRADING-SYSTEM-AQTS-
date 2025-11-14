@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ReferenceLine } from 'recharts';
-import { CoherenceDataPoint } from '../types';
+import { CoherenceDataPoint } from './types';
 
 interface SporeConcentrationChartProps {
   data: CoherenceDataPoint[];

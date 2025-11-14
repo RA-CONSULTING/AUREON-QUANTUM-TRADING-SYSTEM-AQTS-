@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
-import { AureonDataPoint } from '../types';
+import { AureonDataPoint } from './types';
 
 interface AureonChartProps {
   data: AureonDataPoint[];

@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { marked } from 'marked';
-import { ChatMessage } from '../types';
+import { ChatMessage } from './types';
 
 interface ChatPanelProps {
   messages: ChatMessage[];

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { MonitoringEvent } from '../types';
+import { MonitoringEvent } from './types';
 
 interface MonitoringPanelProps {
   events: MonitoringEvent[];

@@ -1,4 +1,4 @@
-import { AureonDataPoint, CoherenceDataPoint } from '../types';
+import { AureonDataPoint, CoherenceDataPoint } from './types';
 import { AQTSOrchestrator } from './core/aqtsOrchestrator';
 
 const DATA_INTERVAL_MS = 150;

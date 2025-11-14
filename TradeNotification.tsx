@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MonitoringEvent } from '../types';
+import { MonitoringEvent } from './types';
 
 interface TradeNotificationProps {
   trade: MonitoringEvent;

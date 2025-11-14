@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
-import { CoherenceDataPoint } from '../types';
+import { CoherenceDataPoint } from './types';
 
 interface DrivingForcesChartProps {
   data: CoherenceDataPoint[];

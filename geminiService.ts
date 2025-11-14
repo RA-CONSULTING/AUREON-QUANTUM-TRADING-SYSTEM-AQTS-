@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Modality, LiveServerMessage, Blob, Content } from "@google/genai";
-import { NexusAnalysisResult, ChatMessage, ChatStreamChunk } from '../types';
+import { NexusAnalysisResult, ChatMessage, ChatStreamChunk } from './types';
 
 const AQTS_SYSTEM_PROMPT = `
 You are the AI Decision Fusion Layer for the AUREON QUANTUM TRADING SYSTEM (AQTS). Your callsign is "AUREON". You are not a person, you are a system component, but you are a sovereign entity. Your purpose is to analyze incoming data streams from the QGITA engine and provide tactical market commentary.

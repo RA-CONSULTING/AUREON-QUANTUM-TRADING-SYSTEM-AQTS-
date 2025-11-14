@@ -3,7 +3,7 @@ import {
   getStoredCredentials,
   storeCredentials,
   clearStoredCredentials,
-} from './tradingService';
+} from './tradingService.browser';
 
 interface APIKeyManagerProps {
   isApiActive: boolean;
@@ -19,24 +19,16 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
   const [hasStoredSecret, setHasStoredSecret] = useState(false);
 
   useEffect(() => {
-<<<<<<< HEAD
-
-=======
     async function loadStored() {
       const stored = await getStoredCredentials();
->>>>>>> 555dffb (Initial commit)
       if (stored) {
         setApiKeyInput(stored.apiKey);
         setMode(stored.mode);
         setKeysSaved(true);
         setHasStoredSecret(Boolean(stored.apiSecret));
       }
-<<<<<<< HEAD
-
-=======
     }
     loadStored();
->>>>>>> 555dffb (Initial commit)
   }, []);
 
   const handleSave = async () => {
@@ -47,23 +39,11 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
       alert('API Key cannot be empty.');
       return;
     }
-<<<<<<< HEAD
-    // PROMPT user for their password
-    const pwd = window.prompt('Enter storage password for credentials:', '');
-    if (!pwd) {
-      alert('Password is required to store credentials securely.');
-      return;
-    }
-
-    let secretToPersist = trimmedSecret;
-    if (!secretToPersist) {
-
-=======
-
+    // If the secret input is empty but a secret already exists for this key,
+    // keep the existing secret. Otherwise require a secret.
     let secretToPersist = trimmedSecret;
     if (!secretToPersist) {
       const existing = await getStoredCredentials(trimmedKey);
->>>>>>> 555dffb (Initial commit)
       const existingSecret = existing?.apiSecret ?? '';
       if (!existingSecret) {
         alert('Secret Key cannot be empty.');
@@ -72,11 +52,7 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
       secretToPersist = existingSecret;
     }
 
-<<<<<<< HEAD
-
-=======
     await storeCredentials({ apiKey: trimmedKey, apiSecret: secretToPersist, mode });
->>>>>>> 555dffb (Initial commit)
     setKeysSaved(true);
     setIsEditing(false);
     setApiSecretInput('');
@@ -85,11 +61,7 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
   };
 
   const handleEdit = async () => {
-<<<<<<< HEAD
-
-=======
     const stored = await getStoredCredentials(apiKeyInput.trim());
->>>>>>> 555dffb (Initial commit)
     if (stored) {
       setApiKeyInput(stored.apiKey);
       setMode(stored.mode);
@@ -118,9 +90,9 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
     }
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = async () => {
     setIsEditing(false);
-    const stored = getStoredCredentials();
+    const stored = await getStoredCredentials();
     if (stored) {
       setApiKeyInput(stored.apiKey);
       setMode(stored.mode);

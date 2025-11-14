@@ -21,7 +21,7 @@ import { runAnalysis, runBacktest } from './lighthouseService';
 import { runGaelicHistoricalSimulation } from './aureonService';
 import { connectWebSocket } from './websocketService';
 import { streamLiveAnalysis, streamChatResponse, startTranscriptionSession } from './geminiService';
-import { executeMarketTrade, annotateTradeEventWithExecution } from './tradingService';
+import { executeMarketTrade, annotateTradeEventWithExecution } from './tradingService.browser';
 import { NexusAnalysisResult, CoherenceDataPoint, ChatMessage, NexusReport, MonitoringEvent, HistoricalDataPoint, AureonDataPoint, AureonReport, GroundingSource } from './types';
 import TradeNotification from './TradeNotification';
 

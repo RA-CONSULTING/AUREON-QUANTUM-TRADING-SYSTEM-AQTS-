@@ -335,9 +335,7 @@ class QueenHive {
       totalAgents,
       totalEquity,
       totalHarvested,
-      hives: metrics,
       generation: this.generation,
-      splitEvents: this.splitEvents,
       hives: metrics.slice(0, 100),
       splitEvents: this.splitEvents.slice(-1000),
       lighthouseStats: {

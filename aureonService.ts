@@ -1,5 +1,5 @@
 
-import { HistoricalDataPoint, AureonDataPoint, PrismStatus, OHLCV } from '../types';
+import { HistoricalDataPoint, AureonDataPoint, PrismStatus, OHLCV } from './types';
 
 // --- NEXUS (COGNITIVE) SIMULATION ---
 

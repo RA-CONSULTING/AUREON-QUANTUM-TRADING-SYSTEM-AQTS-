@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { AureonReport } from '../types';
+import { AureonReport } from './types';
 
 interface AureonReportCardProps {
   report: AureonReport | null;

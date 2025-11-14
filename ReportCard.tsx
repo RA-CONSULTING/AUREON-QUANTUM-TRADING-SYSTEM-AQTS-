@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { NexusReport } from '../types';
+import { NexusReport } from './types';
 
 interface ReportCardProps {
   report: NexusReport | null;

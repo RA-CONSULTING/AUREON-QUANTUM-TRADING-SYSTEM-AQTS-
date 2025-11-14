@@ -93,7 +93,8 @@ export const mergeConfig = (base: AQTSConfig, overrides?: DeepPartial<AQTSConfig
     if (Array.isArray(overrideValue)) {
       (result[key] as unknown) = overrideValue.slice();
     } else if (typeof overrideValue === 'object' && overrideValue !== null && typeof baseValue === 'object' && baseValue !== null) {
-      (result[key] as unknown) = mergeConfigRecursive(baseValue as Record<string, unknown>, overrideValue as Record<string, unknown>);
+      const merged = mergeConfigRecursive(baseValue as any as Record<string, unknown>, overrideValue as any as Record<string, unknown>);
+      (result as any)[key] = merged;
     } else {
       (result[key] as unknown) = overrideValue as AQTSConfig[typeof key];
     }
