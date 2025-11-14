@@ -143,6 +143,38 @@ Code style: TypeScript, Vite + React. Keep changes minimal and focused; do not c
 
 ---
 
+## Live Trading Checklist
+
+- Security: Use Spot-only API keys, withdrawals disabled, IP whitelist, 2FA enabled. Keep `.env` out of git.
+- Funding: Ensure `USDT ≥ $10` or `ETH * ETHUSDT ≥ $10` before starting. Bots auto-wait below this.
+- Env vars: Set `DRY_RUN=false`, `CONFIRM_LIVE_TRADING=yes`, and `BINANCE_TESTNET=false` for live.
+- Sanity checks:
+  - Status server responds: `npm run status:server` then open `/api/status`.
+  - UI reachable: `npm run dev` and verify balances + Trading status.
+- Start a bot (examples):
+
+```bash
+# Hummingbird live (ETH rotations)
+CONFIRM_LIVE_TRADING=yes DRY_RUN=false tsx scripts/hummingbird.ts
+
+# Army Ants live (USDT rotations)
+CONFIRM_LIVE_TRADING=yes DRY_RUN=false tsx scripts/armyAnts.ts
+
+# Lone Wolf live (momentum snipe)
+CONFIRM_LIVE_TRADING=yes DRY_RUN=false tsx scripts/loneWolf.ts
+```
+
+- Monitor:
+  - Status panel shows Trading Enabled and per-bot status (waiting/simulating/active).
+  - Optional beep on threshold crossing; toggle sound in UI.
+  - Check `/api/trades` or the Recent Trades panel for fills.
+- Pause/exit: `Ctrl+C` to stop a bot. To disable live ordering, set `DRY_RUN=true`.
+- Common issues:
+  - "MIN_NOTIONAL"/"insufficient balance": increase spend or fund the account; bots will auto-wait.
+  - API errors: confirm `.env`, permissions (trade enabled), and IP whitelist.
+
+---
+
 ## Docs
 
 - System architecture and specs live under `docs/`.
