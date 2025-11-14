@@ -3,6 +3,11 @@
  * Supports both development and production modes with proper isolation
  */
 
+import dotenv from 'dotenv';
+
+// Load .env file if it exists
+dotenv.config();
+
 export interface EnvironmentConfig {
   mode: 'development' | 'testnet' | 'production';
   binance: {

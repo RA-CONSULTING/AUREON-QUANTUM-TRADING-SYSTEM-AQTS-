@@ -85,7 +85,16 @@ async function simulateLiveTrading() {
   const tradeInterval = setInterval(async () => {
     const symbol = TRADE_SYMBOLS[Math.floor(Math.random() * TRADE_SYMBOLS.length)];
     const side = Math.random() > 0.5 ? 'BUY' : 'SELL';
-    const quantity = 0.001; // Tiny amounts for testing
+    
+    // Use minimum valid lot sizes for each symbol on testnet
+    const lotSizes: Record<string, number> = {
+      BTCUSDT: 0.001,  // Min 0.001 BTC
+      ETHUSDT: 0.01,   // Min 0.01 ETH
+      BNBUSDT: 0.1,    // Min 0.1 BNB
+      ADAUSDT: 1,      // Min 1 ADA
+      XRPUSDT: 1,      // Min 1 XRP
+    };
+    const quantity = lotSizes[symbol] || 0.001;
 
     log('info', `📈 Executing: ${side} ${quantity} ${symbol}`);
 
