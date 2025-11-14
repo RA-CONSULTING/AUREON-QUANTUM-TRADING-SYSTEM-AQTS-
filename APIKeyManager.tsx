@@ -19,17 +19,14 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
   const [hasStoredSecret, setHasStoredSecret] = useState(false);
 
   useEffect(() => {
-    // For demo, prompt the user for a password to unlock credentials.
-    const pwd = window.prompt('Enter storage password to unlock API credentials:', '');
-    if (!pwd) return;
-    getStoredCredentials(pwd).then(stored => {
+
       if (stored) {
         setApiKeyInput(stored.apiKey);
         setMode(stored.mode);
         setKeysSaved(true);
         setHasStoredSecret(Boolean(stored.apiSecret));
       }
-    });
+
   }, []);
 
   const handleSave = async () => {
@@ -49,7 +46,7 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
 
     let secretToPersist = trimmedSecret;
     if (!secretToPersist) {
-      const existing = await getStoredCredentials(pwd);
+
       const existingSecret = existing?.apiSecret ?? '';
       if (!existingSecret) {
         alert('Secret Key cannot be empty.');
@@ -58,7 +55,7 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
       secretToPersist = existingSecret;
     }
 
-    await storeCredentials({ apiKey: trimmedKey, apiSecret: secretToPersist, mode }, pwd);
+
     setKeysSaved(true);
     setIsEditing(false);
     setApiSecretInput('');
@@ -67,12 +64,7 @@ const APIKeyManager: React.FC<APIKeyManagerProps> = ({ isApiActive, onToggleApiS
   };
 
   const handleEdit = async () => {
-    const pwd = window.prompt('Enter storage password to edit API credentials:', '');
-    if (!pwd) {
-      alert('Password is required to view/edit stored credentials.');
-      return;
-    }
-    const stored = await getStoredCredentials(pwd);
+
     if (stored) {
       setApiKeyInput(stored.apiKey);
       setMode(stored.mode);
