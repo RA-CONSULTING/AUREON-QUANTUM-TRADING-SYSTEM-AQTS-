@@ -1,0 +1,23 @@
+{
+  "params": {
+    "PATHS": 5000,
+    "MAX_TRADES": 20000,
+    "START_CAPS": [
+      100
+    ],
+    "FIXED_FRACTION": 0.25
+  },
+  "results": [
+    {
+      "start": 100,
+      "fixed": {
+        "successRate": 0,
+        "medianTrades": null
+      },
+      "empirical": {
+        "successRate": 0,
+        "medianTrades": null
+      }
+    }
+  ]
+}

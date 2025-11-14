@@ -1,0 +1,15 @@
+{
+  "params": {
+    "NUM_AGENTS": 100,
+    "START_PER_AGENT": 100,
+    "MAX_GLOBAL_TRADES": 500000
+  },
+  "successRate": 0,
+  "totalAgents": 100,
+  "successfulAgents": 0,
+  "totalTrades": 50000000,
+  "medianTradesToTarget": null,
+  "successTimes": [],
+  "avgFinalEquity": 1168.3115507560187,
+  "totalAggregateEquity": 116831.15507560188
+}

@@ -1,0 +1,7 @@
+{
+  "name": "AUREON QUANTUM TRADING SYSTEM (AQTS)",
+  "description": "The Bot of All Bots - An AI-powered, multi-exchange crypto trading system utilizing the QGITA quantum detection framework.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

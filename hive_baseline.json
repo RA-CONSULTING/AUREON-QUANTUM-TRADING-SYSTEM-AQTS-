@@ -1,0 +1,13 @@
+{
+  "params": {
+    "NUM_AGENTS": 100,
+    "PRIME_SCALE": 0.01,
+    "MAX_TRADES": 500000,
+    "TARGET": 1000000,
+    "START": 100
+  },
+  "successCount": 100,
+  "successRate": 1,
+  "avgEq": 1000208.6008056103,
+  "totalEq": 100020860.08056103
+}

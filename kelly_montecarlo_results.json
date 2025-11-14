@@ -1,0 +1,41 @@
+{
+  "kelly": 0.9586556809443216,
+  "results": [
+    {
+      "multiplier": 1,
+      "cap": 0.1,
+      "frac": 0.1,
+      "res": {
+        "success": 0,
+        "median": null
+      }
+    },
+    {
+      "multiplier": 1,
+      "cap": 0.05,
+      "frac": 0.05,
+      "res": {
+        "success": 0,
+        "median": null
+      }
+    },
+    {
+      "multiplier": 0.5,
+      "cap": 0.1,
+      "frac": 0.1,
+      "res": {
+        "success": 0,
+        "median": null
+      }
+    },
+    {
+      "multiplier": 0.5,
+      "cap": 0.05,
+      "frac": 0.05,
+      "res": {
+        "success": 0,
+        "median": null
+      }
+    }
+  ]
+}
