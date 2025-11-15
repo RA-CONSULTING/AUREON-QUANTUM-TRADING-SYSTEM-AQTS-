@@ -402,21 +402,34 @@ export class RainbowArchitect {
     
     // CONTRARIAN FLAME TRADING: Execute during high anomaly (|Q| > 0.7)
     const flameLit = lighthouseMetrics.Q > 0.7;
-    const contrarianEntry = this.config.contrarianFlameTrading && flameLit && votes >= this.config.requiredVotes;
-    
-    if (contrarianEntry) {
-      // Contrarian: trade INTO the anomaly (fade the chaos)
-      decision = 'EXECUTE';
-      reason = 'CONTRARIAN_FLAME_ENTRY';
-      console.log(`   🔥 CONTRARIAN FLAME ENTRY — Trading into anomaly (|Q|=${lighthouseMetrics.Q.toFixed(3)})`);
-    } else if (votes < this.config.requiredVotes) {
-      reason = 'INSUFFICIENT_VOTES';
-    } else if (boostedCoherence < appliedThreshold) {
-      reason = 'LOW_COHERENCE';
-    } else if (direction === 'HOLD') {
-      reason = 'NEUTRAL_LAMBDA';
-    } else {
-      decision = 'EXECUTE';
+    const contrarianScenario = this.config.contrarianFlameTrading && flameLit;
+    if (contrarianScenario) {
+      const amplificationGuardActive = harmonicMetrics.amplificationRatio > 12;
+      const votesNeeded = this.config.requiredVotes + (amplificationGuardActive ? 1 : 0);
+
+      if (votes >= votesNeeded) {
+        decision = 'EXECUTE';
+        reason = amplificationGuardActive ? 'CONTRARIAN_FLAME_ENTRY_GUARDED' : 'CONTRARIAN_FLAME_ENTRY';
+        const guardMsg = amplificationGuardActive ? ' (Bee-Safe guard active, +1 vote met)' : '';
+        console.log(`   🔥 CONTRARIAN FLAME ENTRY${guardMsg} — Trading into anomaly (|Q|=${lighthouseMetrics.Q.toFixed(3)}, amp=${harmonicMetrics.amplificationRatio.toFixed(2)}x)`);
+      } else {
+        reason = amplificationGuardActive ? 'INSUFFICIENT_VOTES_HARMONIC_GUARD' : 'INSUFFICIENT_VOTES';
+        if (amplificationGuardActive) {
+          console.log(`   🐝 Bee-Safe Guard: amplification ${harmonicMetrics.amplificationRatio.toFixed(2)}x > 12× requires ${votesNeeded}/9 votes (have ${votes})`);
+        }
+      }
+    }
+
+    if (!contrarianScenario) {
+      if (votes < this.config.requiredVotes) {
+        reason = 'INSUFFICIENT_VOTES';
+      } else if (boostedCoherence < appliedThreshold) {
+        reason = 'LOW_COHERENCE';
+      } else if (direction === 'HOLD') {
+        reason = 'NEUTRAL_LAMBDA';
+      } else {
+        decision = 'EXECUTE';
+      }
     }
 
     if (decision === 'EXECUTE') {
