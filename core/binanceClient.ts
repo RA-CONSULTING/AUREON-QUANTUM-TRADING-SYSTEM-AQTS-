@@ -19,7 +19,7 @@ export interface OrderParams {
   symbol: string;
   side: 'BUY' | 'SELL';
   type: 'MARKET' | 'LIMIT';
-  quantity: number;
+  quantity?: number;
   price?: number; // required for LIMIT orders
   timeInForce?: 'GTC' | 'IOC' | 'FOK'; // Good Till Cancel, Immediate or Cancel, Fill or Kill
   // For MARKET orders, Binance allows spending by quote amount instead of base quantity
@@ -172,6 +172,37 @@ export class BinanceClient {
     count: number;
   }> {
     return this.request('GET', '/v3/ticker/24hr', { symbol });
+  }
+
+  /**
+   * Get 24h ticker stats for all symbols
+   */
+  async get24hrTickers(): Promise<Array<{
+    symbol: string;
+    priceChange: string;
+    priceChangePercent: string;
+    weightedAvgPrice: string;
+    prevClosePrice: string;
+    lastPrice: string;
+    bidPrice: string;
+    askPrice: string;
+    highPrice: string;
+    lowPrice: string;
+    volume: string;
+    quoteVolume: string;
+    openPrice: string;
+    openTime: number;
+    closeTime: number;
+    firstId: number;
+    lastId: number;
+    count: number;
+  }>> {
+    const url = `${this.baseUrl}/v3/ticker/24hr`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Binance API error (${response.status}): Failed to fetch tickers`);
+    }
+    return response.json();
   }
 
   /**
