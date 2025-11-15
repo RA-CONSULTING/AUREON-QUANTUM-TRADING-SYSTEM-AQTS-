@@ -23,6 +23,13 @@ export interface LighthouseMetrics {
   L: number;          // Lighthouse intensity (geometric mean)
 }
 
+export interface HarmonicLoopMetrics {
+  coherencePeak: number;      // Γ_peak — masked ACF peak excluding lag 0 band
+  rmsPower: number;           // RMS(Λ) — current loop power
+  amplificationRatio: number; // RMS(Λ) / RMS_baseline — gain vs early baseline
+  sampleSize: number;         // number of Lambda samples used
+}
+
 /**
  * PHI — Golden ratio
  */
@@ -225,6 +232,60 @@ export function computeLighthouseMetrics(
   const L = computeLighthouseIntensity(C_lin, C_nonlin, G_eff, Q);
   
   return { Q, G_eff, C_lin, C_nonlin, L };
+}
+
+/**
+ * Compute Harmonic Loop Metrics — Coherence & Amplification
+ *
+ * Approximates simulation math:
+ *  - coherencePeak Γ_peak: max normalized autocorrelation excluding lag band around 0
+ *  - rmsPower: √(mean(Λ²)) over full window
+ *  - amplificationRatio: rmsPower / baselineRMS, baseline from earliest 10% of samples
+ *
+ * Mask logic: exclude lags 0..maskWidth (default 10) to avoid trivial self match.
+ */
+export function computeHarmonicLoopMetrics(
+  lambdaSeries: number[],
+  maskWidth: number = 10
+): HarmonicLoopMetrics {
+  const n = lambdaSeries.length;
+  if (n < maskWidth + 5) {
+    return { coherencePeak: 0, rmsPower: 0, amplificationRatio: 0, sampleSize: n };
+  }
+
+  // Mean-center
+  const mean = lambdaSeries.reduce((s, v) => s + v, 0) / n;
+  const centered = lambdaSeries.map(v => v - mean);
+
+  // Autocorrelation (naive) — only compute needed lags up to n/4 for efficiency
+  const maxLag = Math.min(Math.floor(n / 4), 200); // cap for performance
+  const acf: number[] = [];
+  for (let lag = 0; lag <= maxLag; lag++) {
+    let sum = 0;
+    for (let i = 0; i < n - lag; i++) {
+      sum += centered[i] * centered[i + lag];
+    }
+    acf[lag] = sum;
+  }
+  const acf0 = acf[0] === 0 ? 1 : acf[0];
+  for (let i = 0; i < acf.length; i++) acf[i] /= acf0; // normalize
+
+  // Mask out lag band near zero
+  let coherencePeak = 0;
+  for (let lag = maskWidth + 1; lag < acf.length; lag++) {
+    if (acf[lag] > coherencePeak) coherencePeak = acf[lag];
+  }
+
+  // RMS power
+  const rmsPower = Math.sqrt(centered.reduce((s, v) => s + v * v, 0) / n);
+
+  // Baseline RMS from earliest 10% of samples (min 10)
+  const baselineCount = Math.max(10, Math.floor(n * 0.1));
+  const baselineSlice = centered.slice(0, baselineCount);
+  const baselineRMS = Math.sqrt(baselineSlice.reduce((s, v) => s + v * v, 0) / baselineSlice.length) || 1;
+  const amplificationRatio = rmsPower / baselineRMS;
+
+  return { coherencePeak, rmsPower, amplificationRatio, sampleSize: n };
 }
 
 /**

@@ -19,7 +19,7 @@ import { appendFileSync, mkdirSync } from 'fs';
 import path from 'path';
 import { logTelemetry } from '../core/tradeTelemetry';
 import { StargateGrid } from '../core/stargateGrid';
-import { computeLighthouseMetrics } from '../core/lighthouseMetrics';
+import { computeLighthouseMetrics, computeHarmonicLoopMetrics } from '../core/lighthouseMetrics';
 
 interface RainbowConfig {
   symbol: string;
@@ -59,6 +59,7 @@ export class RainbowArchitect {
   private priceHistory: number[] = [];
   private volumeHistory: number[] = [];
   private timeHistory: number[] = [];
+  private lambdaHistory: number[] = []; // For harmonic loop metrics
   
   private cycleCount = 0;
   private totalTrades = 0;
@@ -200,6 +201,10 @@ export class RainbowArchitect {
     const state = this.field.getHistory().slice(-1)[0];
     if (!state) return;
 
+    // Track Lambda history for harmonic loop computation
+    this.lambdaHistory.push(state.Lambda);
+    if (this.lambdaHistory.length > 500) this.lambdaHistory.shift();
+
     // Update history buffers for Lighthouse metrics
     this.priceHistory.push(this.lastSnapshot.price);
     this.volumeHistory.push(this.lastSnapshot.volume || 0);
@@ -296,6 +301,16 @@ export class RainbowArchitect {
       this.volumeHistory,
       this.timeHistory
     );
+
+    // Harmonic loop metrics (Γ_peak, RMS, amplification)
+    const harmonicMetrics = computeHarmonicLoopMetrics(this.lambdaHistory);
+    console.log(`\n🎼 Harmonic Loop Stability:`);
+    console.log(`   Γ_peak (masked): ${harmonicMetrics.coherencePeak.toFixed(4)} (${(harmonicMetrics.coherencePeak * 100).toFixed(2)}%)`);
+    console.log(`   RMS Power:       ${harmonicMetrics.rmsPower.toFixed(4)}`);
+    console.log(`   Amplification:   ${harmonicMetrics.amplificationRatio.toFixed(2)}x vs baseline`);
+    if (harmonicMetrics.coherencePeak > 0.9) {
+      console.log('   🔒 Harmonic Coherence Lock (Γ_peak > 0.9)');
+    }
     
     console.log(`\n🔦 Lighthouse Energy Metrics:`);
     console.log(`   |Q| (Flame):     ${lighthouseMetrics.Q.toFixed(3)} — Anomaly pointer`);
@@ -431,6 +446,12 @@ export class RainbowArchitect {
         C_lin: lighthouseMetrics.C_lin,
         C_nonlin: lighthouseMetrics.C_nonlin,
         L: lighthouseMetrics.L,
+      },
+      harmonicStability: {
+        coherencePeak: harmonicMetrics.coherencePeak,
+        rmsPower: harmonicMetrics.rmsPower,
+        amplificationRatio: harmonicMetrics.amplificationRatio,
+        sampleSize: harmonicMetrics.sampleSize,
       },
     });
   }

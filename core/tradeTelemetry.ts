@@ -24,6 +24,13 @@ export interface TradeTelemetryRecord {
     C_nonlin: number;   // Nonlinear coherence
     L: number;          // Lighthouse intensity
   };
+  // Harmonic loop stability metrics (Harmonic String Theory)
+  harmonicStability?: {
+    coherencePeak: number;      // Γ_peak masked autocorrelation peak
+    rmsPower: number;           // RMS power of Λ
+    amplificationRatio: number; // RMS / baselineRMS gain factor
+    sampleSize: number;         // samples used for calculation
+  };
 }
 
 export function logTelemetry(filePath: string | null, rec: TradeTelemetryRecord): void {
