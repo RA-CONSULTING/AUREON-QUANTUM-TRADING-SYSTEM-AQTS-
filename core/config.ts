@@ -121,3 +121,5 @@ const mergeConfigRecursive = (
   return result;
 };
 
+export const config = defaultAQTSConfig;
+

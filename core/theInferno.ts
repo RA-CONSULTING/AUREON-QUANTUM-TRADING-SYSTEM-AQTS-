@@ -147,19 +147,18 @@ export class Inferno {
       console.log(`   Λ(t) = ${state.Lambda.toFixed(4)}`);
       console.log(`   Γ    = ${state.coherence.toFixed(4)} (Coherence)`);
       
-      // Check Lighthouse consensus (using coherence as proxy for consensus)
-      const consensusReached = state.coherence > this.config.consensusThreshold;
-      const voteCount = consensusReached ? 9 : 0;
+      // Lighthouse consensus via resonance
+      const voteCount = resonance.activeNodes.length;
       
       console.log(`\n🔦 LIGHTHOUSE CONSENSUS:`);
-      console.log(`   Votes: ${voteCount}/9`);
+      console.log(`   Active Nodes: ${voteCount}/9`);
       console.log(`   Status: ${voteCount >= this.config.minConsensusVotes ? '✅ CONSENSUS' : '⏸️  NO CONSENSUS'}`);
       
       console.log(`\n🎯 DOMINANT NODE:`);
-      const nodeInfo = AURIS_TAXONOMY[resonance.dominantNode];
-      console.log(`   ${nodeInfo.animal} (${nodeInfo.role})`);
-      console.log(`   Frequency: ${nodeInfo.frequency} Hz`);
-      console.log(`   Emotional State: ${aurisState.emotionalState}`);
+      const dominantNodeData = AURIS_TAXONOMY[resonance.dominantNode];
+      console.log(`   ${dominantNodeData.animal} (${dominantNodeData.role})`);
+      console.log(`   Frequency: ${dominantNodeData.frequency} Hz`);
+      console.log(`   Emotional State: ${resonance.emotionalState}`);
       
       // Update intensity based on activity
       this.state.intensity = Math.min(1.0, this.state.intensity + 0.05);

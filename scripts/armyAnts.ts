@@ -17,6 +17,27 @@ function roundDown(v: number, d: number) {
   return Math.floor(v * p) / p;
 }
 
+function toStep(value: number, stepSize: number): number {
+  if (!stepSize || stepSize <= 0) return value;
+  const steps = Math.floor(value / stepSize);
+  return steps * stepSize;
+}
+
+async function getSymbolConstraints(client: BinanceClient, symbol: string): Promise<{ minQty: number; stepSize: number; minNotional: number; price: number }> {
+  const info = await client.getExchangeInfo([symbol]);
+  const sym = info.symbols?.find((s: any) => s.symbol === symbol) || {};
+  const filters = sym.filters || [];
+  const find = (t: string) => filters.find((f: any) => f.filterType === t || f.type === t) || {};
+  const lot = find('LOT_SIZE');
+  const mlot = find('MARKET_LOT_SIZE');
+  const notional = find('NOTIONAL') || find('MIN_NOTIONAL');
+  const minQty = parseFloat(mlot.minQty || lot.minQty || '0');
+  const stepSize = parseFloat(lot.stepSize || '0');
+  const minNotional = parseFloat(notional.minNotional || '0');
+  const price = await client.getPrice(symbol);
+  return { minQty: isFinite(minQty) ? minQty : 0, stepSize: isFinite(stepSize) ? stepSize : 0, minNotional: isFinite(minNotional) ? minNotional : 0, price };
+}
+
 async function getBalance(client: BinanceClient, asset: string): Promise<number> {
   const acct = await client.getAccount();
   return Number(acct.balances.find((b) => b.asset === asset)?.free || 0);
@@ -64,17 +85,55 @@ async function buyUsdtAlt(
   symbol: string,
   spendUSDT: number
 ): Promise<{ baseBought: number; avgPrice: number }> {
+  const { minQty, stepSize, minNotional, price } = await getSymbolConstraints(client, symbol);
+  const requiredQuote = Math.max(minQty * price, minNotional);
+  if (spendUSDT < requiredQuote) {
+    throw new Error(`Spend $${spendUSDT.toFixed(2)} < exchange min $${requiredQuote.toFixed(2)} — skip ${symbol}`);
+  }
+  // Liquidity/depth pre-check: ensure order book can satisfy at least min base
+  try {
+    const ob = await client.getOrderBook(symbol, 10);
+    const minBaseNeeded = Math.max(minQty, minNotional > 0 ? (minNotional / price) : 0);
+    let sumAsk = 0;
+    for (const [askPxStr, askQtyStr] of ob.asks) {
+      const askQty = Number(askQtyStr);
+      sumAsk += askQty;
+      if (sumAsk >= minBaseNeeded) break;
+    }
+    if (sumAsk < minBaseNeeded) {
+      throw new Error(`Insufficient depth for ${symbol}: book ask qty ${sumAsk.toFixed(6)} < minBase ${minBaseNeeded.toFixed(6)}`);
+    }
+  } catch (e: any) {
+    throw new Error(`Depth check failed for ${symbol}: ${e.message || e}`);
+  }
+
   console.log(`🟢 Buying ~$${spendUSDT.toFixed(2)} of ${symbol}`);
   console.log(`📡 Source: Army Ants (USDT rotations, small alt spends)`);
   const DRY_RUN = process.env.DRY_RUN === 'true';
   let order: any;
   if (DRY_RUN) {
     const px = await client.getPrice(symbol);
-    const qty = spendUSDT / px;
-    order = { executedQty: String(qty), cummulativeQuoteQty: String(spendUSDT) };
+    let qty = spendUSDT / px;
+    if (stepSize > 0) qty = toStep(qty, stepSize);
+    order = { executedQty: String(qty), cummulativeQuoteQty: String(qty * px) };
     console.log(`DRY_RUN: simulate BUY ${symbol} spend $${spendUSDT.toFixed(2)} (~${qty.toFixed(6)} units @ $${px.toFixed(6)})`);
   } else {
-    order = await client.placeOrder({ symbol, side: 'BUY', type: 'MARKET', quoteOrderQty: spendUSDT, quantity: 0 });
+    try {
+      order = await client.placeOrder({ symbol, side: 'BUY', type: 'MARKET', quoteOrderQty: spendUSDT, quantity: 0 });
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      // Fallback: compute quantity with LOT_SIZE stepping
+      if (msg.includes('LOT_SIZE') || msg.includes('-2010') || msg.includes('-1013')) {
+        const px = await client.getPrice(symbol);
+        let qty = spendUSDT / px;
+        if (stepSize > 0) qty = toStep(qty, stepSize);
+        if (qty < minQty) throw new Error(`Fallback qty ${qty} < minQty ${minQty} for ${symbol}`);
+        console.log(`↩️  Fallback: placing MARKET by quantity ${qty} (stepped)`);
+        order = await client.placeOrder({ symbol, side: 'BUY', type: 'MARKET', quantity: qty });
+      } else {
+        throw err;
+      }
+    }
   }
   const qty = Number(order.executedQty);
   const cost = Number(order.cummulativeQuoteQty);
@@ -88,8 +147,11 @@ async function sellUsdtAlt(
   symbol: string,
   qty: number
 ): Promise<void> {
-  const q = roundDown(qty * 0.99, 6);
+  const { stepSize, minQty } = await getSymbolConstraints(client, symbol);
+  let q = roundDown(qty * 0.99, 6);
+  if (stepSize > 0) q = toStep(q, stepSize);
   if (q <= 0) return;
+  if (q < minQty) { console.log(`Skip sell ${symbol}: qty ${q} < minQty ${minQty}`); return; }
   console.log(`🔴 Selling ${q} ${symbol.replace('USDT','')} back to USDT`);
   const DRY_RUN = process.env.DRY_RUN === 'true';
   if (DRY_RUN) {
@@ -112,6 +174,18 @@ async function rotateSymbol(
     await ensureUsdt(client, spendUSDT, wait);
   } catch (e: any) {
     console.log(`⏭️  Skip: ${e.message}`);
+    return;
+  }
+  // Pre-check constraints to skip illiquid/minimum-violating pairs
+  try {
+    const { minQty, minNotional, price } = await getSymbolConstraints(client, symbol);
+    const requiredQuote = Math.max(minQty * price, minNotional);
+    if (spendUSDT < requiredQuote) {
+      console.log(`⏭️  Skip ${symbol}: spend $${spendUSDT.toFixed(2)} < min $${requiredQuote.toFixed(2)}`);
+      return;
+    }
+  } catch (err: any) {
+    console.log(`⏭️  Skip ${symbol}: cannot fetch constraints (${err.message})`);
     return;
   }
   const { baseBought, avgPrice } = await buyUsdtAlt(client, symbol, spendUSDT);
@@ -139,7 +213,19 @@ async function rotateSymbol(
 async function convertBackToEth(client: BinanceClient, retainUsdt = false): Promise<void> {
   const usdt = await getBalance(client, 'USDT');
   if (usdt < 10) return;
-  const toSpend = retainUsdt ? Math.max(0, usdt - 12) : usdt * 0.98;
+  let toSpend = retainUsdt ? Math.max(0, usdt - 12) : usdt * 0.98;
+  if (toSpend < 10) return;
+  // Round quote to QUOTE_LOT_SIZE step
+  try {
+    const info = await client.getExchangeInfo(['ETHUSDT']);
+    const sym = info.symbols?.find((s: any) => s.symbol === 'ETHUSDT') || {};
+    const qlot = (sym.filters || []).find((f: any) => f.filterType === 'QUOTE_LOT_SIZE' || f.type === 'QUOTE_LOT_SIZE') || {};
+    const qStep = parseFloat(qlot.stepSize || '0');
+    if (isFinite(qStep) && qStep > 0) {
+      const steps = Math.floor(toSpend / qStep);
+      toSpend = steps * qStep;
+    }
+  } catch {}
   if (toSpend < 10) return;
   console.log(`🧭 Converting $${toSpend.toFixed(2)} USDT -> ETH`);
   await client.placeOrder({ symbol: 'ETHUSDT', side: 'BUY', type: 'MARKET', quoteOrderQty: toSpend, quantity: 0 });
@@ -168,7 +254,9 @@ async function main() {
 
   const startEth = await getBalance(client, 'ETH');
   const ethPrice = await client.getPrice('ETHUSDT');
-  console.log(`🐜 ArmyAnts starting with ${startEth.toFixed(8)} ETH (~$${(startEth * ethPrice).toFixed(2)})`);
+  console.log(`🐜 The Ants begin their work — workers of the earth`);
+  console.log(`   Starting with ${startEth.toFixed(8)} ETH (~$${(startEth * ethPrice).toFixed(2)})`);
+  console.log(`   Gathering from ${Math.min(maxRotations, universe.length)} USDT sources...`);
 
   for (let i = 0; i < Math.min(maxRotations, universe.length); i++) {
     const sym = universe[i].trim();
@@ -181,7 +269,20 @@ async function main() {
 
   await convertBackToEth(client, retain);
   const endEth = await getBalance(client, 'ETH');
-  console.log(`\n🏁 Done. ETH: ${endEth.toFixed(8)} (Δ ${(endEth - startEth).toFixed(8)} ETH)`);
+  const delta = endEth - startEth;
+  const deltaSign = delta >= 0 ? '+' : '';
+  const profitUSD = delta * ethPrice;
+  
+  // Save profit for Garden orchestrator
+  try {
+    const artifactPath = require('path').join(process.cwd(), 'artifacts', 'ants_profit.json');
+    await require('fs/promises').writeFile(artifactPath, JSON.stringify({ profitUSD, deltaETH: delta, timestamp: Date.now() }, null, 2));
+  } catch {}
+  
+  console.log(`\n🐜 The Ants have completed their work`);
+  console.log(`🏁 ETH: ${endEth.toFixed(8)} (${deltaSign}${delta.toFixed(8)} ETH)`);
+  console.log(`💰 Profit: ${deltaSign}$${profitUSD.toFixed(2)} USD`);
+  console.log(`🌍 The earth is richer for their labor`);
 }
 
 main().catch((e) => {

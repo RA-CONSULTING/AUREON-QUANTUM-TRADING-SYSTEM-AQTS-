@@ -19,7 +19,7 @@ export interface OrderParams {
   symbol: string;
   side: 'BUY' | 'SELL';
   type: 'MARKET' | 'LIMIT';
-  quantity?: number;
+  quantity?: number; // optional when quoteOrderQty provided
   price?: number; // required for LIMIT orders
   timeInForce?: 'GTC' | 'IOC' | 'FOK'; // Good Till Cancel, Immediate or Cancel, Fill or Kill
   // For MARKET orders, Binance allows spending by quote amount instead of base quantity
@@ -190,17 +190,13 @@ export class BinanceClient {
     lowPrice: string;
     volume: string;
     quoteVolume: string;
-    openPrice: string;
-    openTime: number;
-    closeTime: number;
-    firstId: number;
-    lastId: number;
+    quoteAssetVolume: string;
     count: number;
   }>> {
     const url = `${this.baseUrl}/v3/ticker/24hr`;
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Binance API error (${response.status}): Failed to fetch tickers`);
+      throw new Error(`Binance API error (${response.status}): Failed to fetch 24h tickers`);
     }
     return response.json();
   }
@@ -215,6 +211,21 @@ export class BinanceClient {
     const resp = await fetch(url);
     if (!resp.ok) {
       throw new Error(`Binance API error (${resp.status}): Failed to fetch exchangeInfo`);
+    }
+    return resp.json();
+  }
+
+  /**
+   * Get order book depth (public endpoint) for liquidity checks
+   */
+  async getOrderBook(
+    symbol: string,
+    limit: 5 | 10 | 20 | 50 | 100 | 500 | 1000 = 10
+  ): Promise<{ lastUpdateId: number; bids: [string, string][]; asks: [string, string][] }> {
+    const url = `${this.baseUrl}/v3/depth?symbol=${symbol}&limit=${limit}`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      throw new Error(`Binance API error (${resp.status}): Failed to fetch order book for ${symbol}`);
     }
     return resp.json();
   }

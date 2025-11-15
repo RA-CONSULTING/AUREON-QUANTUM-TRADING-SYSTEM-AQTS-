@@ -9,11 +9,11 @@ This guide activates **REAL MONEY TRADING** on your Binance live account. All tr
 ## 📋 Prerequisites
 
 1. **Live Binance Account** - Not testnet
-   - URL: https://www.binance.com (not testnet.binance.com)
+   - URL: [https://www.binance.com](https://www.binance.com) (not testnet.binance.com)
    - Account verified and funded with USDT
 
 2. **API Keys Generated**
-   - Go to: https://www.binance.com/en/user/settings/api-management
+   - Go to: [https://www.binance.com/en/user/settings/api-management](https://www.binance.com/en/user/settings/api-management)
    - Create NEW API key (separate from testnet keys)
    - Enable: Reading Account Info, Placing Orders, Canceling/Querying Orders
    - ✅ Disable IP restrictions (for dev environment) OR add your IP
@@ -30,7 +30,7 @@ This guide activates **REAL MONEY TRADING** on your Binance live account. All tr
 
 ### Step 1: Generate Live API Keys
 
-1. Go to https://www.binance.com/en/user/settings/api-management
+1. Go to [https://www.binance.com/en/user/settings/api-management](https://www.binance.com/en/user/settings/api-management)
 2. Click "Create API" → API Label: "AUREON-LIVE"
 3. Choose "System Generated" (safer)
 4. Complete security verification
@@ -76,18 +76,21 @@ npx tsx scripts/realMoneyLive.ts
 ## 🎯 Live Trading Features
 
 ### Real Order Execution
+
 - **Limit Orders** - 1% buffer to ensure fill
 - **Position Tracking** - Real-time P&L on live positions
 - **Risk Management** - Automatic position sizing based on risk %
 - **Daily Limits** - Prevent over-trading
 
 ### Multi-Hive Queen Network
+
 - **5 Agents per Hive** - Conservative for live money
 - **Auto-Spawning** - When equity grows 5x
 - **Real-time Monitoring** - Live P&L tracking
 - **Graceful Shutdown** - Closes all positions cleanly
 
 ### Safety Mechanisms
+
 1. **Position Size Limits** - Scales down if exceeds max order size
 2. **Daily Trade Caps** - Stops trading after limit reached
 3. **Risk Percentage** - Each trade risks only 0.5% of agent balance
@@ -99,7 +102,8 @@ npx tsx scripts/realMoneyLive.ts
 ## 📊 Live Trading Workflow
 
 ### 1. Connection Phase
-```
+
+```text
 ✅ Connect to LIVE Binance
 📊 Fetch real account balance
 💰 Display available capital
@@ -107,14 +111,16 @@ npx tsx scripts/realMoneyLive.ts
 ```
 
 ### 2. Hive Initialization
-```
+
+```text
 ✨ Create initial hive with full balance
 👥 Distribute capital across agents (default 5)
 📍 Ready to trade
 ```
 
 ### 3. Trading Loop
-```
+
+```text
 Per step:
   - Each agent selects random symbol
   - Fetches live market price
@@ -129,7 +135,8 @@ Every 20 steps:
 ```
 
 ### 4. Hive Spawning
-```
+
+```text
 When average agent balance > 5x initial:
   - Harvest 10% of hive equity
   - Create new generation hive
@@ -137,7 +144,8 @@ When average agent balance > 5x initial:
 ```
 
 ### 5. Graceful Shutdown
-```
+
+```text
 On completion:
   - Close all open positions
   - Calculate total P&L
@@ -149,6 +157,7 @@ On completion:
 ## 💡 Trading Symbols
 
 Default symbols for live trading:
+
 - **BTCUSDT** - Bitcoin
 - **ETHUSDT** - Ethereum
 - **BNBUSDT** - Binance Coin
@@ -193,6 +202,7 @@ tail -100 <log-file>
 ## 📈 Expected Behavior
 
 ### Healthy Metrics
+
 ✅ Consistent P&L growth from trades
 ✅ Win rate stabilizing around 50%+
 ✅ Hives spawning after 5x equity growth
@@ -200,6 +210,7 @@ tail -100 <log-file>
 ✅ Position sizes scaling with balance
 
 ### Warning Signs
+
 ❌ Rapid balance decline (> 5% per step)
 ❌ Frequent failed orders (check API limits)
 ❌ No trades executing for 10+ steps
@@ -235,26 +246,29 @@ tail -100 <log-file>
 If issues occur:
 
 1. **Check Binance API Status**
-   - https://www.binance.us/en/support/announcement/list
+   - [Binance US Status Page](https://www.binance.us/en/support/announcement/list)
 
-2. **Review Logs**
-   ```bash
-   # Last 100 lines of execution
-   tail -100 trading_session.log
-   ```
+1. **Review Logs**
 
-3. **Verify Credentials**
-   ```bash
-   # Test connection (safe, read-only)
-   npx tsx scripts/liveTest.ts
-   ```
+```bash
+# Last 100 lines of execution
+tail -100 trading_session.log
+```
 
-4. **Rollback to Testnet**
-   ```bash
-   # Restore backup .env
-   cp .env.backup .env
-   export BINANCE_TESTNET=true
-   ```
+1. **Verify Credentials**
+
+```bash
+# Test connection (safe, read-only)
+npx tsx scripts/liveTest.ts
+```
+
+1. **Rollback to Testnet**
+
+```bash
+# Restore backup .env
+cp .env.backup .env
+export BINANCE_TESTNET=true
+```
 
 ---
 

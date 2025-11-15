@@ -32,6 +32,17 @@ export interface AureonDataPoint {
   inerchaVector: number; // 𝓘ₜ
   coherenceIndex: number;
   prismStatus: PrismStatus;
+  
+  // Animal node metrics
+  tigerCut?: boolean;
+  hummingbirdLocked?: boolean;
+  falconSurge?: boolean;
+  surgeMagnitude?: number;
+  deerAlert?: boolean | 'SENSITIVE';
+  dolphinSong?: boolean | 'SINGING';
+  clownfishBond?: boolean | 'BONDED';
+  pandaHeart?: number;
+  memory?: any;
 }
 
 export type PrismStatus = 'Blue' | 'Gold' | 'Red' | 'Unknown';

@@ -9,8 +9,12 @@
  * "The pride hunts together" — Gary Leckey, Nov 15 2025
  */
 
+// Load environment (.env) settings
+import '../core/environment';
+
 import { spawn, ChildProcess } from 'child_process';
 import PrideScanner from './prideScanner';
+import ElephantMemory from '../core/elephantMemory';
 
 interface Hunter {
   id: number;
@@ -31,11 +35,13 @@ interface PrideConfig {
   minVolatility: number;
   minVolume: number;
   huntDuration: number; // Minutes before reassigning targets
+  cooldownMinutes?: number; // Elephant memory cooldown
 }
 
 class PrideHunt {
   private config: PrideConfig;
   private scanner: PrideScanner;
+  private memory: ElephantMemory;
   private hunters: Hunter[] = [];
   private prideCount = 13; // 1 Lion + 12 Lionesses
   private huntRound = 0;
@@ -50,6 +56,7 @@ class PrideHunt {
       minVolatility: config.minVolatility || 2.0,
       minVolume: config.minVolume || 100000,
       huntDuration: config.huntDuration || 5, // 5 minutes per hunt round
+      cooldownMinutes: config.cooldownMinutes ?? 15,
     };
 
     if (!this.config.apiKey || !this.config.apiSecret) {
@@ -57,6 +64,7 @@ class PrideHunt {
     }
 
     this.scanner = new PrideScanner(this.config.apiKey, this.config.apiSecret, this.config.testnet);
+    this.memory = new ElephantMemory({ cooldownMinutes: this.config.cooldownMinutes });
     this.initializePride();
   }
 
@@ -97,6 +105,20 @@ class PrideHunt {
     console.log(`   • Hunt Duration: ${this.config.huntDuration} minutes`);
     console.log(`   • Min Volatility: ${this.config.minVolatility}%`);
     console.log(`   • Min Volume: $${(this.config.minVolume / 1000).toFixed(0)}K`);
+    console.log(`   • Cooldown: ${this.config.cooldownMinutes} minutes`);
+    // Dream Band banner (inherited by child processes via env)
+    const dreamMode = (process.env.DREAM_MODE || 'off').toLowerCase();
+    const dreamAlpha = process.env.DREAM_ALPHA ? parseFloat(process.env.DREAM_ALPHA) : undefined;
+    const dreamBeta = process.env.DREAM_BETA ? parseFloat(process.env.DREAM_BETA) : undefined;
+    if (dreamMode !== 'off' || (dreamAlpha !== undefined && dreamBeta !== undefined)) {
+      const modeLabel = dreamMode === 'dream' ? 'DREAM BAND — SELF-SIMULATION' : dreamMode === 'sweet' ? 'SWEET SPOT — COHERENCE LOCK' : 'CUSTOM BAND';
+      const a = (dreamAlpha ?? (dreamMode === 'dream' ? 0.3 : dreamMode === 'sweet' ? 0.9 : 1.2)).toFixed(3);
+      const b = (dreamBeta ?? (dreamMode === 'dream' || dreamMode === 'sweet' ? 0.8 : 0.8)).toFixed(3);
+      console.log('');
+      console.log('   Dream Band: ' + modeLabel);
+      console.log(`   • α (observer gain): ${a}`);
+      console.log(`   • β (memory gain):   ${b}`);
+    }
     console.log('');
 
     while (true) {
@@ -129,10 +151,21 @@ class PrideHunt {
     await this.scanner.scanPride();
 
     // 2. Get top targets
-    const targets = this.scanner.getHuntingTargets(
+    let targets = this.scanner.getHuntingTargets(
       this.config.minVolume / 1000000,
       this.config.minVolatility
     );
+
+    // Elephant memory filter: avoid recently hunted / blacklisted
+    const avoided: string[] = [];
+    targets = targets.filter(t => {
+      const avoid = this.memory.shouldAvoid(t.symbol);
+      if (avoid) avoided.push(t.symbol);
+      return !avoid;
+    });
+    if (avoided.length) {
+      console.log(`🧠 Elephant avoids (cooldown/blacklist): ${avoided.slice(0,10).join(', ')}${avoided.length>10?'…':''}`);
+    }
 
     if (targets.length < this.prideCount) {
       console.log(`⚠️  Only ${targets.length} targets found, need ${this.prideCount}`);
@@ -180,6 +213,14 @@ class PrideHunt {
       const volume = ((target.volume24h || 0) / 1000000).toFixed(2);
       
       console.log(`   ${icon} ${hunter.role.padEnd(8)} #${hunter.id.toString().padStart(2)} → ${hunter.symbol.padEnd(12)} | ${price.padStart(12)} | ${change.padStart(7)}% | $${volume}M`);
+
+      // Remember assignment in memory
+      this.memory.rememberHunt(hunter.symbol, {
+        volume: target.volume24h || 0,
+        change: target.priceChangePercent || 0,
+        hunter: `${hunter.role}#${hunter.id}`,
+        round: this.huntRound,
+      });
     }
     console.log('');
   }
@@ -246,6 +287,10 @@ class PrideHunt {
         CONFIRM_LIVE_TRADING: 'yes',
         DRY_RUN: 'false',
         RAINBOW_CYCLES: this.config.cyclesPerHunt.toString(),
+        // Propagate Dream Band controls
+        DREAM_MODE: process.env.DREAM_MODE || '',
+        DREAM_ALPHA: process.env.DREAM_ALPHA || '',
+        DREAM_BETA: process.env.DREAM_BETA || '',
       };
 
       hunter.process = spawn('npx', ['tsx', ...args], {
@@ -261,11 +306,24 @@ class PrideHunt {
         if (output.includes('TRADE SIGNAL')) {
           hunter.trades++;
         }
+        // Capture summary lines
+        const tradesMatch = output.match(/Total Trades:\s*(\d+)/i);
+        if (tradesMatch) {
+          const n = parseInt(tradesMatch[1] || '0');
+          if (!Number.isNaN(n)) hunter.trades = n;
+        }
+        const profitMatch = output.match(/Total Profit:\s*([+-]?[0-9]+(?:\.[0-9]+)?)\s*USDT/i);
+        if (profitMatch) {
+          const p = parseFloat(profitMatch[1] || '0');
+          if (!Number.isNaN(p)) hunter.profit = p;
+        }
       });
 
       hunter.process.on('close', (code: number) => {
         hunter.status = 'complete';
         hunter.process = null;
+        // Remember result
+        this.memory.rememberResult(hunter.symbol, { trades: hunter.trades, profit: hunter.profit });
         resolve();
       });
 

@@ -16,6 +16,27 @@ function roundDown(v: number, d: number) {
   return Math.floor(v * p) / p;
 }
 
+function toStep(v: number, stepSize: number): number {
+  if (!stepSize || stepSize <= 0) return v;
+  const steps = Math.floor(v / stepSize);
+  return steps * stepSize;
+}
+
+async function getSymbolConstraints(client: BinanceClient, symbol: string): Promise<{ minQty: number; stepSize: number; minNotional: number; price: number }> {
+  const info = await client.getExchangeInfo([symbol]);
+  const sym = info.symbols?.find((s: any) => s.symbol === symbol) || {};
+  const filters = sym.filters || [];
+  const find = (t: string) => filters.find((f: any) => f.filterType === t || f.type === t) || {};
+  const lot = find('LOT_SIZE');
+  const mlot = find('MARKET_LOT_SIZE');
+  const notional = find('NOTIONAL') || find('MIN_NOTIONAL');
+  const minQty = parseFloat(mlot.minQty || lot.minQty || '0');
+  const stepSize = parseFloat(lot.stepSize || '0');
+  const minNotional = parseFloat(notional.minNotional || '0');
+  const price = await client.getPrice(symbol);
+  return { minQty: isFinite(minQty) ? minQty : 0, stepSize: isFinite(stepSize) ? stepSize : 0, minNotional: isFinite(minNotional) ? minNotional : 0, price };
+}
+
 async function getBalance(client: BinanceClient, asset: string): Promise<number> {
   const acct = await client.getAccount();
   return Number(acct.balances.find((b) => b.asset === asset)?.free || 0);
@@ -77,15 +98,38 @@ async function tradeOnce(client: BinanceClient, base: BaseMode, symbol: string, 
   console.log(`🐺 LoneWolf hunting ${symbol} with spend ${base==='USDT' ? '$'+spendQuote.toFixed(2) : spendQuote.toFixed(6)+' ETH'}`);
   console.log(`📡 Source: Lone Wolf (momentum snipe, single trade)`);
 
+  // Pre-check constraints and skip if spend insufficient
+  try {
+    const { minQty, minNotional, price } = await getSymbolConstraints(client, symbol);
+    const requiredQuote = Math.max(minQty * price, minNotional);
+    if (spendQuote < requiredQuote) {
+      console.log(`⏭️  Skip ${symbol}: spend ${base==='USDT'?'$'+spendQuote.toFixed(2):spendQuote.toFixed(6)+' ETH'} < min ${base==='USDT'?'$'+requiredQuote.toFixed(2):requiredQuote.toFixed(6)+' ETH'}`);
+      return;
+    }
+  } catch (err: any) {
+    console.log(`⏭️  Skip ${symbol}: cannot fetch constraints (${err.message})`);
+    return;
+  }
+
   // Buy using quoteOrderQty (spend amount in base quote)
   let buy: any;
   if (DRY_RUN) {
     const px = await client.getPrice(symbol);
-    const qty = spendQuote / px;
+    let qty = spendQuote / px;
+    try { const { stepSize } = await getSymbolConstraints(client, symbol); if (stepSize > 0) qty = toStep(qty, stepSize); } catch {}
     buy = { executedQty: String(qty), cummulativeQuoteQty: String(spendQuote) };
     console.log(`DRY_RUN: simulate BUY ${symbol} spend ${base==='USDT' ? '$'+spendQuote.toFixed(2) : spendQuote.toFixed(6)+' ETH'} (~${qty.toFixed(6)} units @ ${base==='USDT' ? '$'+px.toFixed(6) : (px.toFixed(8)+' ETH')})`);
   } else {
-    buy = await client.placeOrder({ symbol, side: 'BUY', type: 'MARKET', quoteOrderQty: spendQuote, quantity: 0 });
+    // Place MARKET order using quantity (LOT_SIZE stepped) to avoid LOT_SIZE errors
+    const { stepSize, minQty } = await getSymbolConstraints(client, symbol);
+    const px = await client.getPrice(symbol);
+    let qty = spendQuote / px;
+    if (stepSize > 0) qty = toStep(qty, stepSize);
+    if (qty < minQty || qty <= 0) {
+      console.log(`⏭️  Skip ${symbol}: computed qty ${qty} < minQty ${minQty}`);
+      return;
+    }
+    buy = await client.placeOrder({ symbol, side: 'BUY', type: 'MARKET', quantity: qty });
   }
   const baseQty = Number(buy.executedQty);
   const cost = Number(buy.cummulativeQuoteQty);
@@ -101,7 +145,8 @@ async function tradeOnce(client: BinanceClient, base: BaseMode, symbol: string, 
     process.stdout.write(`\r${symbol} ${base==='USDT' ? '$'+px.toFixed(6) : px.toFixed(8)+' ETH'} (${sign}${(ch*100).toFixed(2)}%)   `);
     if (ch >= tp || ch <= sl) {
       console.log(`\nTrigger ${(ch*100).toFixed(2)}% — exiting...`);
-      const sellQty = roundDown(baseQty * 0.99, 6);
+      let sellQty = roundDown(baseQty * 0.99, 6);
+      try { const { stepSize, minQty } = await getSymbolConstraints(client, symbol); if (stepSize > 0) sellQty = toStep(sellQty, stepSize); if (sellQty < minQty) { console.log(`Skip sell ${symbol}: qty ${sellQty} < minQty ${minQty}`); break; } } catch {}
       if (sellQty > 0) {
         if (DRY_RUN) {
           console.log(`DRY_RUN: simulate SELL ${symbol} qty=${sellQty}`);
@@ -153,9 +198,20 @@ async function main() {
   if (base === 'USDT' && process.env.WOLF_RETAIN_USDT !== 'yes') {
     const usdt = await getBalance(client, 'USDT');
     if (usdt >= 10) {
-      const spend = usdt * 0.98;
-      console.log(`🔁 Converting $${spend.toFixed(2)} USDT -> ETH`);
-      await client.placeOrder({ symbol: 'ETHUSDT', side: 'BUY', type: 'MARKET', quoteOrderQty: spend, quantity: 0 });
+      let spend = usdt * 0.98;
+      // Round quoteOrderQty to QUOTE_LOT_SIZE step to avoid precision errors
+      try {
+        const info = await client.getExchangeInfo(['ETHUSDT']);
+        const sym = info.symbols?.find((s: any) => s.symbol === 'ETHUSDT') || {};
+        const qlot = (sym.filters || []).find((f: any) => f.filterType === 'QUOTE_LOT_SIZE' || f.type === 'QUOTE_LOT_SIZE') || {};
+        const qStep = parseFloat(qlot.stepSize || '0');
+        const toStepQuote = (v: number, step: number) => (step > 0 ? Math.floor(v / step) * step : v);
+        spend = toStepQuote(spend, isFinite(qStep) ? qStep : 0);
+      } catch {}
+      if (spend >= 10) {
+        console.log(`🔁 Converting $${spend.toFixed(2)} USDT -> ETH`);
+        await client.placeOrder({ symbol: 'ETHUSDT', side: 'BUY', type: 'MARKET', quoteOrderQty: spend, quantity: 0 });
+      }
     }
   }
 

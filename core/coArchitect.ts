@@ -210,7 +210,7 @@ export class CoArchitect {
       symbol: this.config.symbol,
       side: 'BUY',
       type: 'MARKET',
-      quoteOrderQty: this.config.tradeAmountUSDT,
+      quantity: ethAmount, // provide quantity instead of quoteOrderQty for type safety
     });
     this.balanceETH += ethAmount;
     this.balanceUSDT -= this.config.tradeAmountUSDT;

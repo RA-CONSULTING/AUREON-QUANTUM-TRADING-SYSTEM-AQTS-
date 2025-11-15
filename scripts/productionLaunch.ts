@@ -96,9 +96,6 @@ async function performPreFlightChecks(): Promise<boolean> {
   log('\n🔌 Testing API connectivity...', BLUE);
   
   try {
-    const apiKey = process.env.BINANCE_API_KEY || '';
-    const apiSecret = process.env.BINANCE_API_SECRET || '';
-    const testnet = process.env.BINANCE_TESTNET === 'true';
     const client = new BinanceClient({ apiKey, apiSecret, testnet });
     const serverTime = await client.getServerTime();
     checkItem('Binance API', 'pass', `Connected - Server time: ${new Date(serverTime).toISOString()}`);
@@ -114,6 +111,7 @@ async function performPreFlightChecks(): Promise<boolean> {
     const apiKey = process.env.BINANCE_API_KEY || '';
     const apiSecret = process.env.BINANCE_API_SECRET || '';
     const testnet = process.env.BINANCE_TESTNET === 'true';
+    
     const client = new BinanceClient({ apiKey, apiSecret, testnet });
     const account = await client.getAccount();
     
@@ -159,6 +157,7 @@ async function performPreFlightChecks(): Promise<boolean> {
     const apiKey = process.env.BINANCE_API_KEY || '';
     const apiSecret = process.env.BINANCE_API_SECRET || '';
     const testnet = process.env.BINANCE_TESTNET === 'true';
+    
     const client = new BinanceClient({ apiKey, apiSecret, testnet });
     const account = await client.getAccount();
     
@@ -188,10 +187,11 @@ async function performPreFlightChecks(): Promise<boolean> {
     const apiKey = process.env.BINANCE_API_KEY || '';
     const apiSecret = process.env.BINANCE_API_SECRET || '';
     const testnet = process.env.BINANCE_TESTNET === 'true';
-    const client = new BinanceClient({ apiKey, apiSecret, testnet });
-    const ticker = await client.getPrice('BTCUSDT');
     
-    checkItem('Market Data', 'pass', `BTCUSDT: $${ticker.toFixed(2)}`);
+    const client = new BinanceClient({ apiKey, apiSecret, testnet });
+    const ticker = await client.get24hStats('BTCUSDT');
+    
+    checkItem('Market Data', 'pass', `BTCUSDT: $${parseFloat(ticker.lastPrice).toFixed(2)}`);
   } catch (error) {
     checkItem('Market Data', 'fail', `Cannot retrieve: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return false;
