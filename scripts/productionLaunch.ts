@@ -10,7 +10,6 @@
  */
 
 import { spawn, ChildProcess } from 'child_process';
-import { config } from '../core/config';
 import { BinanceClient } from '../core/binanceClient';
 
 const GREEN = '\x1b[32m';
@@ -52,14 +51,18 @@ async function performPreFlightChecks(): Promise<boolean> {
   // 1. Environment Configuration
   log('📋 Checking environment configuration...', BLUE);
   
-  if (!config.binance.apiKey || config.binance.apiKey === 'your_api_key_here') {
+  const apiKey = process.env.BINANCE_API_KEY || '';
+  const apiSecret = process.env.BINANCE_API_SECRET || '';
+  const testnet = process.env.BINANCE_TESTNET === 'true';
+  
+  if (!apiKey || apiKey === 'your_api_key_here') {
     checkItem('API Key', 'fail', 'Binance API key not configured');
     return false;
   } else {
     checkItem('API Key', 'pass', 'API key configured');
   }
 
-  if (!config.binance.apiSecret || config.binance.apiSecret === 'your_api_secret_here') {
+  if (!apiSecret || apiSecret === 'your_api_secret_here') {
     checkItem('API Secret', 'fail', 'Binance API secret not configured');
     return false;
   } else {
@@ -82,17 +85,21 @@ async function performPreFlightChecks(): Promise<boolean> {
     checkItem('Live Trading Confirmation', 'pass', 'Live trading confirmed');
   }
 
-  if (config.binance.testnet) {
+  if (testnet) {
     checkItem('Network', 'warning', 'Testnet mode enabled - using testnet.binance.vision');
   } else {
     checkItem('Network', 'pass', 'Production network - using api.binance.com');
   }
 
+
   // 3. API Connectivity
   log('\n🔌 Testing API connectivity...', BLUE);
   
   try {
-    const client = new BinanceClient();
+    const apiKey = process.env.BINANCE_API_KEY || '';
+    const apiSecret = process.env.BINANCE_API_SECRET || '';
+    const testnet = process.env.BINANCE_TESTNET === 'true';
+    const client = new BinanceClient({ apiKey, apiSecret, testnet });
     const serverTime = await client.getServerTime();
     checkItem('Binance API', 'pass', `Connected - Server time: ${new Date(serverTime).toISOString()}`);
   } catch (error) {
@@ -104,8 +111,11 @@ async function performPreFlightChecks(): Promise<boolean> {
   log('\n💰 Checking account balance...', BLUE);
   
   try {
-    const client = new BinanceClient();
-    const account = await client.getAccountInfo();
+    const apiKey = process.env.BINANCE_API_KEY || '';
+    const apiSecret = process.env.BINANCE_API_SECRET || '';
+    const testnet = process.env.BINANCE_TESTNET === 'true';
+    const client = new BinanceClient({ apiKey, apiSecret, testnet });
+    const account = await client.getAccount();
     
     // Find balances with non-zero free amounts
     const balances = account.balances
@@ -146,8 +156,11 @@ async function performPreFlightChecks(): Promise<boolean> {
   log('\n🔓 Verifying trading permissions...', BLUE);
   
   try {
-    const client = new BinanceClient();
-    const account = await client.getAccountInfo();
+    const apiKey = process.env.BINANCE_API_KEY || '';
+    const apiSecret = process.env.BINANCE_API_SECRET || '';
+    const testnet = process.env.BINANCE_TESTNET === 'true';
+    const client = new BinanceClient({ apiKey, apiSecret, testnet });
+    const account = await client.getAccount();
     
     const canTrade = account.canTrade;
     const canWithdraw = account.canWithdraw;
@@ -172,10 +185,13 @@ async function performPreFlightChecks(): Promise<boolean> {
   log('\n📊 Testing market data access...', BLUE);
   
   try {
-    const client = new BinanceClient();
-    const ticker = await client.get24hrTicker('BTCUSDT');
+    const apiKey = process.env.BINANCE_API_KEY || '';
+    const apiSecret = process.env.BINANCE_API_SECRET || '';
+    const testnet = process.env.BINANCE_TESTNET === 'true';
+    const client = new BinanceClient({ apiKey, apiSecret, testnet });
+    const ticker = await client.getPrice('BTCUSDT');
     
-    checkItem('Market Data', 'pass', `BTCUSDT: $${parseFloat(ticker.lastPrice).toFixed(2)}`);
+    checkItem('Market Data', 'pass', `BTCUSDT: $${ticker.toFixed(2)}`);
   } catch (error) {
     checkItem('Market Data', 'fail', `Cannot retrieve: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return false;

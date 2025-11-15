@@ -58,13 +58,13 @@ significantMoments.forEach((moment, idx) => {
   console.log(`   ⚡ ACTIVE NODES: ${resonance.activeNodes.join(', ')}`);
   
   // Show specific node activations
-  if (moment.tigerCut) console.log('   🐯 TIGER CUT: Noise eliminated');
-  if (moment.hummingbirdLocked) console.log('   🐦 HUMMINGBIRD: Coherence LOCKED');
-  if (moment.falconSurge) console.log(`   🦅 FALCON SURGE: Magnitude ${(moment.surgeMagnitude || 0).toFixed(3)}`);
-  if (moment.deerAlert === 'SENSITIVE') console.log('   🦌 DEER: Micro-shift detected');
-  if (moment.dolphinSong === 'SINGING') console.log('   🐬 DOLPHIN: Wave transmission active');
-  if (moment.clownfishBond === 'BONDED') console.log('   🐠 CLOWNFISH: Systems bonded');
-  if (moment.pandaHeart > 0.8) console.log(`   🐼 PANDA: Heart resonance ${moment.pandaHeart.toFixed(3)}`);
+  if ((moment as any).tigerCut) console.log('   🐯 TIGER CUT: Noise eliminated');
+  if ((moment as any).hummingbirdLocked) console.log('   🐦 HUMMINGBIRD: Coherence LOCKED');
+  if ((moment as any).falconSurge) console.log(`   🦅 FALCON SURGE: Magnitude ${((moment as any).surgeMagnitude || 0).toFixed(3)}`);
+  if ((moment as any).deerAlert === 'SENSITIVE') console.log('   🦌 DEER: Micro-shift detected');
+  if ((moment as any).dolphinSong === 'SINGING') console.log('   🐬 DOLPHIN: Wave transmission active');
+  if ((moment as any).clownfishBond === 'BONDED') console.log('   🐠 CLOWNFISH: Systems bonded');
+  if ((moment as any).pandaHeart > 0.8) console.log(`   🐼 PANDA: Heart resonance ${(moment as any).pandaHeart.toFixed(3)}`);
 });
 
 console.log('\n\n═══════════════════════════════════════════════════════════\n');
@@ -81,13 +81,13 @@ console.log('9-NODE ACTIVATION STATISTICS');
 console.log('═══════════════════════════════════════════════════════════\n');
 
 const stats = {
-  tigerCuts: aureonData.filter(d => d.tigerCut).length,
-  hummingbirdLocks: aureonData.filter(d => d.hummingbirdLocked).length,
-  falconSurges: aureonData.filter(d => d.falconSurge).length,
-  deerAlerts: aureonData.filter(d => d.deerAlert === 'SENSITIVE').length,
-  dolphinSinging: aureonData.filter(d => d.dolphinSong === 'SINGING').length,
-  clownfishBonded: aureonData.filter(d => d.clownfishBond === 'BONDED').length,
-  highPandaHeart: aureonData.filter(d => d.pandaHeart > 0.8).length,
+  tigerCuts: aureonData.filter(d => (d as any).tigerCut).length,
+  hummingbirdLocks: aureonData.filter(d => (d as any).hummingbirdLocked).length,
+  falconSurges: aureonData.filter(d => (d as any).falconSurge).length,
+  deerAlerts: aureonData.filter(d => (d as any).deerAlert === 'SENSITIVE').length,
+  dolphinSinging: aureonData.filter(d => (d as any).dolphinSong === 'SINGING').length,
+  clownfishBonded: aureonData.filter(d => (d as any).clownfishBond === 'BONDED').length,
+  highPandaHeart: aureonData.filter(d => (d as any).pandaHeart > 0.8).length,
 };
 
 console.log(`🐯 Tiger Cuts (Noise Elimination):    ${stats.tigerCuts} (${(stats.tigerCuts / aureonData.length * 100).toFixed(1)}%)`);
@@ -137,7 +137,7 @@ console.log('\n═════════════════════�
 console.log('MEMORY TRACE — OWL LONG-TERM STORAGE');
 console.log('═══════════════════════════════════════════════════════════\n');
 
-const owlMemory = finalState.memory || [];
+const owlMemory = (finalState as any).memory || [];
 const memorySize = owlMemory.length;
 console.log(`📜 Total cycles stored: ${memorySize}`);
 

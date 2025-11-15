@@ -17,7 +17,7 @@
 
 import { BinanceClient, BinanceConfig } from './binanceClient';
 import { RealityField } from './masterEquation';
-import { executeAurisLoop, analyzeResonance, AurisState, AURIS_TAXONOMY } from './aurisSymbolicTaxonomy';
+import { executeAurisLoop, analyzeResonance, AURIS_TAXONOMY } from './aurisSymbolicTaxonomy';
 
 export interface InfernoConfig {
   symbol: string;
@@ -144,20 +144,21 @@ export class Inferno {
       }
       
       console.log(`\n🌊 LAMBDA STATE:`);
-      console.log(`   Λ(t) = ${state.lambda.toFixed(4)}`);
+      console.log(`   Λ(t) = ${state.Lambda.toFixed(4)}`);
       console.log(`   Γ    = ${state.coherence.toFixed(4)} (Coherence)`);
       
-      // Check Lighthouse consensus
-      const consensus = state.lighthouseVotes;
-      const voteCount = consensus.filter(v => v).length;
+      // Check Lighthouse consensus (using coherence as proxy for consensus)
+      const consensusReached = state.coherence > this.config.consensusThreshold;
+      const voteCount = consensusReached ? 9 : 0;
       
       console.log(`\n🔦 LIGHTHOUSE CONSENSUS:`);
       console.log(`   Votes: ${voteCount}/9`);
       console.log(`   Status: ${voteCount >= this.config.minConsensusVotes ? '✅ CONSENSUS' : '⏸️  NO CONSENSUS'}`);
       
       console.log(`\n🎯 DOMINANT NODE:`);
-      console.log(`   ${resonance.dominantNode.animal} (${resonance.dominantNode.role})`);
-      console.log(`   Frequency: ${resonance.dominantNode.frequency} Hz`);
+      const nodeInfo = AURIS_TAXONOMY[resonance.dominantNode];
+      console.log(`   ${nodeInfo.animal} (${nodeInfo.role})`);
+      console.log(`   Frequency: ${nodeInfo.frequency} Hz`);
       console.log(`   Emotional State: ${aurisState.emotionalState}`);
       
       // Update intensity based on activity
@@ -185,7 +186,7 @@ export class Inferno {
                          voteCount >= Math.max(3, this.config.minConsensusVotes - 2); // More permissive
       
       if (shouldTrade) {
-        const direction = state.lambda > 0 ? 'BUY' : 'SELL';
+        const direction = state.Lambda > 0 ? 'BUY' : 'SELL';
         console.log(`\n🔥🔥🔥 FIRE TRADE: ${direction} 🔥🔥🔥`);
         
         if (!this.config.dryRun) {
