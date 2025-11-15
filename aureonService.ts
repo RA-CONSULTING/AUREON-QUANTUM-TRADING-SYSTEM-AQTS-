@@ -1,5 +1,6 @@
 
 import { HistoricalDataPoint, AureonDataPoint, PrismStatus, OHLCV } from './types';
+import { executeAurisLoop, analyzeResonance, AurisResonance } from './core/aurisSymbolicTaxonomy';
 
 // --- NEXUS (COGNITIVE) SIMULATION ---
 
@@ -192,11 +193,20 @@ export const runAureonSimulation = (length: number): AureonDataPoint[] => {
             prismStatus = 'Gold';
         }
 
-        aureonData.push({
+        // Build Aureon data point
+        const aureonPoint: AureonDataPoint = {
             time: i, market, sentiment, policyRate, dataIntegrity, crystalCoherence, celestialModulators,
             polarisBaseline, choeranceDrift, pingPong, gravReflection, unityIndex,
             inerchaVector, coherenceIndex, prismStatus,
-        });
+        };
+
+        // Execute the 9-node Auris loop
+        const enhancedState = executeAurisLoop(aureonPoint);
+
+        // Merge enhanced state back into aureonPoint
+        Object.assign(aureonPoint, enhancedState);
+
+        aureonData.push(aureonPoint);
     }
 
     return aureonData;
