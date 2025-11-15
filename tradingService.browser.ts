@@ -26,16 +26,17 @@ export interface TradeExecutionResult {
 export const getStoredCredentials = async (apiKeyOptional?: string): Promise<StoredCredentials | null> => {
   if (typeof window === 'undefined') return null;
   const apiKey = window.localStorage.getItem('aureon_api_key') || apiKeyOptional || '';
-  const apiSecret = window.localStorage.getItem('aureon_api_secret') || '';
+  const encApiSecret = window.localStorage.getItem('aureon_api_secret') || '';
   const mode = (window.localStorage.getItem('aureon_api_mode') as 'live' | 'testnet') || 'testnet';
-  if (!apiKey || !apiSecret) return null;
+  if (!apiKey || !encApiSecret) return null;
+  const apiSecret = await decryptApiSecret(encApiSecret, apiKey);
   return { apiKey, apiSecret, mode };
 };
 
 export const storeCredentials = async (c: StoredCredentials): Promise<void> => {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem('aureon_api_key', c.apiKey);
-  window.localStorage.setItem('aureon_api_secret', c.apiSecret);
+  window.localStorage.setItem('aureon_api_secret', await encryptApiSecret(c.apiSecret, c.apiKey));
   window.localStorage.setItem('aureon_api_mode', c.mode);
 };
 
