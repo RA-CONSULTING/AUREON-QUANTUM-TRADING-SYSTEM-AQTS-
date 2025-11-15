@@ -65,6 +65,7 @@ async function buyUsdtAlt(
   spendUSDT: number
 ): Promise<{ baseBought: number; avgPrice: number }> {
   console.log(`🟢 Buying ~$${spendUSDT.toFixed(2)} of ${symbol}`);
+  console.log(`📡 Source: Army Ants (USDT rotations, small alt spends)`);
   const DRY_RUN = process.env.DRY_RUN === 'true';
   let order: any;
   if (DRY_RUN) {

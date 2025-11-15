@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 artifacts/
+
+# Environment files (do not commit secrets)
+.env
+.env.*
+!.env.example

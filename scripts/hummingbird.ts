@@ -104,6 +104,7 @@ async function main() {
   }
 
   console.log(`Selected: ${symbol} | Spending ${spendETH} ETH (~$${(spendETH * ethPrice).toFixed(2)})`);
+  console.log(`📡 Source: Hummingbird (ETH-quoted rotations with TP/SL)`);
 
   // BUY via quoteOrderQty (amount of ETH to spend)
   const simulateOrder = async (sym: string, side: 'BUY'|'SELL', opts: { quantity?: number; quoteOrderQty?: number }) => {

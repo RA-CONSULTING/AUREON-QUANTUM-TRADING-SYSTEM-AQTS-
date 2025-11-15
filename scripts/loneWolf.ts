@@ -75,6 +75,7 @@ async function pickMomentumSymbol(client: BinanceClient, base: BaseMode): Promis
 async function tradeOnce(client: BinanceClient, base: BaseMode, symbol: string, spendQuote: number, tp=0.008, sl=-0.006, maxMinutes=5): Promise<void> {
   const DRY_RUN = process.env.DRY_RUN === 'true';
   console.log(`🐺 LoneWolf hunting ${symbol} with spend ${base==='USDT' ? '$'+spendQuote.toFixed(2) : spendQuote.toFixed(6)+' ETH'}`);
+  console.log(`📡 Source: Lone Wolf (momentum snipe, single trade)`);
 
   // Buy using quoteOrderQty (spend amount in base quote)
   let buy: any;
