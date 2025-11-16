@@ -370,7 +370,7 @@ export class BinanceWebSocket extends EventEmitter {
       this.emit('subscriptions-list', response.result);
     } else if (response.error) {
       // Error
-      console.error(`🌈 Subscription error (ID ${response.id}):`, response.error);
+      console.error('🌈 Subscription error (ID %s):', response.id, response.error);
       this.emit('subscription-error', response.error);
     }
   }
