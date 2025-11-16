@@ -2,6 +2,15 @@ import { MonitoringEvent } from './types';
 
 export type TradeSide = 'BUY' | 'SELL';
 
+// Simple base64 encoding for API secret (note: not cryptographically secure)
+const encryptApiSecret = async (secret: string, _key: string): Promise<string> => {
+  return btoa(secret);
+};
+
+const decryptApiSecret = async (encrypted: string, _key: string): Promise<string> => {
+  return atob(encrypted);
+};
+
 export interface StoredCredentials {
   apiKey: string;
   apiSecret: string;
