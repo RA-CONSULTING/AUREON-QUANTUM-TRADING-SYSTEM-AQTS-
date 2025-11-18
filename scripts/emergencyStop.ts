@@ -59,10 +59,7 @@ async function cancelAllOrders() {
     const apiKey = process.env.BINANCE_API_KEY || '';
     const apiSecret = process.env.BINANCE_API_SECRET || '';
     const testnet = process.env.BINANCE_TESTNET === 'true';
-<<<<<<< HEAD
-=======
     
->>>>>>> 645fdd6 (Increase execution: Lower consensus (5/9), reduce coherence (0.85), add contrarian flame trading)
     const client = new BinanceClient({ apiKey, apiSecret, testnet });
     const openOrders = await client.getOpenOrders();
     
