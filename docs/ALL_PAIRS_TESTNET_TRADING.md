@@ -144,17 +144,25 @@ npm run testnet:all-pairs:dry
 
 ### Live Trading Mode
 
-Execute actual trades on testnet:
+**⚠️ IMPLEMENTATION STATUS:**
+The all-pairs trading framework is fully implemented and functional. However, **actual order execution logic is not yet implemented**. The system will:
+- Discover and score all 801 pairs ✅
+- Filter and rank by consciousness metrics ✅
+- Rotate through qualified pairs systematically ✅
+- Mark pairs as "qualified for trading" ℹ️
+- **NOT place actual orders** (requires implementation)
+
+To implement order execution, modify the `tradePair()` method in `scripts/allPairsTestnet.ts` to include your specific trading strategy (position sizing, order type, entry/exit logic, etc.).
 
 ```bash
-npm run testnet:all-pairs
+npm run testnet:all-pairs  # Framework runs, no actual orders placed
 ```
 
-**⚠️ Important:**
-- Requires testnet API keys with trading permissions
-- Trades with real testnet funds (virtual money)
+**Current behavior:**
+- Requires testnet API keys for pair discovery
 - Follows all consciousness-based filters
-- Respects rate limits
+- Tracks which pairs qualify for trading
+- Does NOT execute actual trades (TODO in code)
 
 ### Custom Configuration
 

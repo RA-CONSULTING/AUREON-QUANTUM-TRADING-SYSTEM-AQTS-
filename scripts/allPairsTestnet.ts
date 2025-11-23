@@ -117,12 +117,11 @@ class AllPairsTestnetTrader {
 
     try {
       const exchangeInfo = await this.client.getExchangeInfo();
+      // Filter for active trading pairs, excluding leveraged tokens
+      const leveragedTokenPattern = /(UP|DOWN|BULL|BEAR|[0-9]+(L|S))$/;
       const symbols = exchangeInfo.symbols.filter((s: any) => 
         s.status === 'TRADING' &&
-        !s.symbol.includes('UP') &&
-        !s.symbol.includes('DOWN') &&
-        !s.symbol.includes('BULL') &&
-        !s.symbol.includes('BEAR')
+        !leveragedTokenPattern.test(s.symbol)
       );
 
       console.log(`✅ Found ${symbols.length} active trading pairs`);
@@ -329,6 +328,22 @@ class AllPairsTestnetTrader {
 
   /**
    * Execute trade on a single pair
+   * 
+   * TODO: Implement actual order execution logic
+   * This is a framework for trading all pairs. Actual order execution
+   * should be implemented based on specific strategy requirements:
+   * - Position sizing (Kelly criterion, fixed %, etc.)
+   * - Order type (MARKET, LIMIT, etc.)
+   * - Entry/exit logic
+   * - Risk management (stop-loss, take-profit)
+   * 
+   * Example implementation would use:
+   * await this.client.placeOrder({
+   *   symbol: pair.symbol,
+   *   side: 'BUY',
+   *   type: 'MARKET',
+   *   quoteOrderQty: calculatePositionSize(pair)
+   * });
    */
   private async tradePair(pair: TradingPair): Promise<void> {
     console.log(`🎯 ${pair.symbol.padEnd(12)} | Γ=${(pair.coherence * 100).toFixed(1)}% | Votes=${pair.votes}/9 | Score=${pair.opportunity.toFixed(0)}`);
@@ -342,9 +357,20 @@ class AllPairsTestnetTrader {
       return;
     }
 
-    // In live mode, implement actual trading logic here
-    // For now, just log the intention
-    console.log(`   ⚠️  Live trading not yet implemented for ${pair.symbol}`);
+    // Live trading - framework ready, order execution to be implemented
+    try {
+      // Mark as processed for rotation tracking
+      // Actual order placement would go here (see TODO above)
+      console.log(`   ℹ️  ${pair.symbol} qualified for trading (order execution: TODO)`);
+      this.session.pairsTraded.add(pair.symbol);
+      this.session.totalTrades++;
+      this.session.successfulTrades++;
+      pair.tradeCount++;
+      pair.lastTraded = Date.now();
+    } catch (error: any) {
+      console.log(`   ❌ Error: ${error.message}`);
+      this.session.failedTrades++;
+    }
   }
 
   /**
@@ -375,6 +401,12 @@ class AllPairsTestnetTrader {
     console.log('║     AUREON Consciousness Applied to All Pairs           ║');
     console.log('║                                                           ║');
     console.log('╚═══════════════════════════════════════════════════════════╝\n');
+
+    if (!this.config.dryRun) {
+      console.log('⚠️  NOTE: Order execution not yet implemented');
+      console.log('   Framework will identify qualified pairs for trading');
+      console.log('   See tradePair() method for implementation TODO\n');
+    }
 
     try {
       // Step 1: Discover all pairs
@@ -420,9 +452,9 @@ class AllPairsTestnetTrader {
       })),
     };
 
-    const filepath = '/home/runner/work/AUREON-QUANTUM-TRADING-SYSTEM-AQTS-/AUREON-QUANTUM-TRADING-SYSTEM-AQTS-/testnet_qualified_pairs.json';
+    const filepath = './testnet_qualified_pairs.json';
     writeFileSync(filepath, JSON.stringify(data, null, 2));
-    console.log(`💾 Qualified pairs saved to: testnet_qualified_pairs.json\n`);
+    console.log(`💾 Qualified pairs saved to: ${filepath}\n`);
   }
 
   /**

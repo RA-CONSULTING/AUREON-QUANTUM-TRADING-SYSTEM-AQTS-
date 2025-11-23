@@ -117,9 +117,9 @@ async function discoverTestnetPairs(): Promise<TestnetPairAnalysis> {
     };
 
     // Save to file
-    const outputPath = '/home/runner/work/AUREON-QUANTUM-TRADING-SYSTEM-AQTS-/AUREON-QUANTUM-TRADING-SYSTEM-AQTS-/testnet_pairs.json';
+    const outputPath = './testnet_pairs.json';
     writeFileSync(outputPath, JSON.stringify(analysis, null, 2));
-    console.log(`💾 Analysis saved to: testnet_pairs.json`);
+    console.log(`💾 Analysis saved to: ${outputPath}`);
     console.log('');
 
     // Display sample pairs from each major quote asset
