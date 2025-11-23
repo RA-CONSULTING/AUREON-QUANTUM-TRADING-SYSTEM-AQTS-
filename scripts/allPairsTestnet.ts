@@ -26,6 +26,10 @@ import { RainbowBridge } from '../core/theRainbowBridge';
 import { ThePrism } from '../core/thePrism';
 import { writeFileSync, readFileSync, existsSync } from 'fs';
 
+// Pattern to identify and exclude leveraged tokens from trading
+// Matches: UP, DOWN, BULL, BEAR, 3L, 5S, etc.
+const LEVERAGED_TOKEN_PATTERN = /(UP|DOWN|BULL|BEAR|[0-9]+(L|S))$/;
+
 interface TradingPair {
   symbol: string;
   baseAsset: string;
@@ -118,10 +122,9 @@ class AllPairsTestnetTrader {
     try {
       const exchangeInfo = await this.client.getExchangeInfo();
       // Filter for active trading pairs, excluding leveraged tokens
-      const leveragedTokenPattern = /(UP|DOWN|BULL|BEAR|[0-9]+(L|S))$/;
       const symbols = exchangeInfo.symbols.filter((s: any) => 
         s.status === 'TRADING' &&
-        !leveragedTokenPattern.test(s.symbol)
+        !LEVERAGED_TOKEN_PATTERN.test(s.symbol)
       );
 
       console.log(`✅ Found ${symbols.length} active trading pairs`);
@@ -186,8 +189,9 @@ class AllPairsTestnetTrader {
     for (const [symbol, pair] of this.pairs) {
       processed++;
       
+      // Show progress every 100 pairs
       if (processed % 100 === 0) {
-        process.stdout.write(`\r   Progress: ${processed}/${this.pairs.size} pairs...`);
+        console.log(`   Progress: ${processed}/${this.pairs.size} pairs scored...`);
       }
 
       // Skip if insufficient volume
@@ -329,21 +333,31 @@ class AllPairsTestnetTrader {
   /**
    * Execute trade on a single pair
    * 
-   * TODO: Implement actual order execution logic
-   * This is a framework for trading all pairs. Actual order execution
-   * should be implemented based on specific strategy requirements:
-   * - Position sizing (Kelly criterion, fixed %, etc.)
-   * - Order type (MARKET, LIMIT, etc.)
-   * - Entry/exit logic
-   * - Risk management (stop-loss, take-profit)
+   * IMPLEMENTATION REQUIRED:
+   * This method currently marks pairs as qualified but does not place orders.
    * 
-   * Example implementation would use:
-   * await this.client.placeOrder({
+   * To implement order execution:
+   * 1. Define position sizing strategy (e.g., fixed USDT amount, % of capital, Kelly criterion)
+   * 2. Add entry logic (determine BUY/SELL based on Lambda direction)
+   * 3. Implement order placement using this.client.placeOrder()
+   * 4. Add exit logic (stop-loss, take-profit, time-based, coherence drop)
+   * 5. Track open positions and P/L
+   * 
+   * Example implementation:
+   * ```typescript
+   * const positionSize = this.calculatePositionSize(pair);
+   * const side = pair.Lambda > 0 ? 'BUY' : 'SELL';
+   * const order = await this.client.placeOrder({
    *   symbol: pair.symbol,
-   *   side: 'BUY',
+   *   side,
    *   type: 'MARKET',
-   *   quoteOrderQty: calculatePositionSize(pair)
+   *   quoteOrderQty: positionSize
    * });
+   * // Track position, set exit conditions, etc.
+   * ```
+   * 
+   * Timeline: Implementation depends on specific trading strategy requirements.
+   * Framework is production-ready for testing filtering/rotation logic.
    */
   private async tradePair(pair: TradingPair): Promise<void> {
     console.log(`🎯 ${pair.symbol.padEnd(12)} | Γ=${(pair.coherence * 100).toFixed(1)}% | Votes=${pair.votes}/9 | Score=${pair.opportunity.toFixed(0)}`);

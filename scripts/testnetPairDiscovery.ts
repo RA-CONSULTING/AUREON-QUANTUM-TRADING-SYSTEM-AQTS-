@@ -37,18 +37,20 @@ async function discoverTestnetPairs(): Promise<TestnetPairAnalysis> {
   console.log('║                                                           ║');
   console.log('╚═══════════════════════════════════════════════════════════╝\n');
 
-  const apiKey = process.env.BINANCE_API_KEY || '';
-  const apiSecret = process.env.BINANCE_API_SECRET || '';
+  const apiKey = process.env.BINANCE_API_KEY;
+  const apiSecret = process.env.BINANCE_API_SECRET;
   const testnet = process.env.BINANCE_TESTNET === 'true';
 
   console.log(`⚙️  Configuration:`);
   console.log(`   • Testnet Mode: ${testnet ? 'YES' : 'NO'}`);
-  console.log(`   • API Key Set: ${apiKey ? 'YES' : 'NO (using public endpoints)'}`);
+  console.log(`   • API Key Set: ${apiKey ? 'YES' : 'NO (using public endpoints only)'}`);
   console.log('');
 
+  // Note: Some endpoints (like exchangeInfo) are public and don't require auth
+  // Using placeholder values for client initialization to access public endpoints
   const client = new BinanceClient({ 
-    apiKey: apiKey || 'dummy', 
-    apiSecret: apiSecret || 'dummy', 
+    apiKey: apiKey || '__PUBLIC_ENDPOINT__', 
+    apiSecret: apiSecret || '__PUBLIC_ENDPOINT__', 
     testnet 
   });
 
