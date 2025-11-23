@@ -423,6 +423,13 @@ npm run rainbow:dry    # Rainbow Architect with WebSocket (dry run)
 npm run rainbow:live   # Full live trading with all 4 layers
 ```
 
+**All Pairs Testnet Trading (NEW):**
+```bash
+npm run testnet:discover       # Discover all 801 testnet pairs
+npm run testnet:all-pairs:dry  # Dry run on all qualified pairs
+npm run testnet:all-pairs      # Live trading on all 801 pairs
+```
+
 **Classic Bots (dry-run recommended):**
 ```bash
 npm run hb:dry     # Hummingbird ETH rotations (DRY_RUN)
