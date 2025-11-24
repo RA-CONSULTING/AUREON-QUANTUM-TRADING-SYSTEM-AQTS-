@@ -15,7 +15,7 @@ import { log } from '../core/environment';
 
 const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'DOGEUSDT'];
 const AGENT_TRADE_INTERVAL = 500; // milliseconds between trades per agent
-const RISK_PERCENT_PER_TRADE = 10; // 10% risk per trade (more aggressive to meet minimums)
+const RISK_PERCENT_PER_TRADE = 25; // 25% risk per trade (aggressive but safe for small accounts)
 
 interface Position {
   symbol: string;
@@ -60,6 +60,7 @@ class LiveMoneyQueenHive {
   private tradingPaused = false;
   private maxDailyTrades = 0;
   private dailyTradeCount = 0;
+  private symbolFilters: Map<string, { minQty: number; maxQty: number; stepSize: number }> = new Map();
 
   constructor() {
     // Safety: Verify we have confirmation before proceeding
@@ -136,8 +137,9 @@ Current safety settings:
           .filter((s) => !s.includes(this.baseAsset + this.baseAsset));
       }
 
-      if (this.accountBalance < 10) {
-        throw new Error(`❌ Insufficient balance: £${this.accountBalance}. Minimum: £10`);
+      if (this.accountBalance < 8) {
+        console.log(`⚠️  Low balance: £${this.accountBalance.toFixed(2)}. Minimum recommended: £10`);
+        console.log(`⚠️  Will attempt to trade but order sizes may be too small for Binance minimums.`);
       }
 
       console.log(`💰 Available Capital: £${this.accountBalance.toFixed(2)} USDT`);
@@ -147,10 +149,51 @@ Current safety settings:
       this.maxDailyTrades = Number(process.env.MAX_DAILY_TRADES || 500);
       console.log(`⏱️  Max daily trades: ${this.maxDailyTrades}`);
 
+      // Fetch exchange info for LOT_SIZE filters
+      console.log(`🔍 Fetching symbol filters (all symbols)...`);
+      // Fetch ALL symbols to avoid 400 error if one doesn't exist
+      const exchangeInfo = await this.client!.getExchangeInfo();
+      
+      // Filter for our trading symbols
+      const validSymbols = new Set(this.tradingSymbols);
+      
+      for (const symbolInfo of exchangeInfo.symbols) {
+        if (validSymbols.has(symbolInfo.symbol)) {
+            const lotSizeFilter = symbolInfo.filters.find((f: any) => f.filterType === 'LOT_SIZE');
+            if (lotSizeFilter) {
+            this.symbolFilters.set(symbolInfo.symbol, {
+                minQty: Number(lotSizeFilter.minQty),
+                maxQty: Number(lotSizeFilter.maxQty),
+                stepSize: Number(lotSizeFilter.stepSize),
+            });
+            console.log(`   ${symbolInfo.symbol}: stepSize ${lotSizeFilter.stepSize}, minQty ${lotSizeFilter.minQty}`);
+            }
+        }
+      }
+      
+      // Remove invalid symbols from trading list
+      const foundSymbols = Array.from(this.symbolFilters.keys());
+      const missingSymbols = this.tradingSymbols.filter(s => !foundSymbols.includes(s));
+      if (missingSymbols.length > 0) {
+          console.log(`⚠️  Removing invalid/unavailable symbols: ${missingSymbols.join(', ')}`);
+          this.tradingSymbols = foundSymbols;
+      }
+
+      if (this.tradingSymbols.length === 0) {
+          throw new Error('❌ No valid trading symbols found for base asset ' + this.baseAsset);
+      }
+
       // Wait 3 seconds for user to review
       console.log(`\n⏳ Starting in 3 seconds... (Press Ctrl+C to cancel)\n`);
       await new Promise((r) => setTimeout(r, 3000));
-    } catch (err) {
+    } catch (err: any) {
+      console.error('Detailed Error:', err);
+      if (err.response) {
+        try {
+            const text = await err.response.text();
+            console.error('Response body:', text);
+        } catch (e) {}
+      }
       log('error', '❌ Failed to connect to live account', err);
       throw err;
     }
@@ -165,6 +208,26 @@ Current safety settings:
     }
   }
 
+  private adjustQuantity(symbol: string, quantity: number): number {
+    const filter = this.symbolFilters.get(symbol);
+    if (!filter) return quantity;
+
+    // Round down to nearest stepSize
+    const stepSize = filter.stepSize;
+    const precision = Math.round(-Math.log10(stepSize));
+    
+    // Ensure quantity >= minQty
+    if (quantity < filter.minQty) return 0;
+
+    // Round down to stepSize
+    // e.g. qty 0.469439, step 0.1 -> 0.4
+    // e.g. qty 0.469439, step 0.01 -> 0.46
+    const adjustedQty = Math.floor(quantity / stepSize) * stepSize;
+    
+    // Fix floating point precision issues (e.g. 0.300000000004)
+    return Number(adjustedQty.toFixed(precision));
+  }
+
   async executeLiveOrder(
     symbol: string,
     side: 'BUY' | 'SELL',
@@ -172,13 +235,23 @@ Current safety settings:
     price: number
   ): Promise<{ orderId: string; status: string } | null> {
     try {
+      // Adjust quantity for LOT_SIZE filter
+      const adjustedQuantity = this.adjustQuantity(symbol, quantity);
+      
+      if (adjustedQuantity === 0) {
+        console.log(`⚠️  Quantity ${quantity} too small for ${symbol} (min ${this.symbolFilters.get(symbol)?.minQty})`);
+        return null;
+      }
+
       // Safety checks
       const maxOrderSize = Number(process.env.MAX_ORDER_SIZE || 10000);
-      const orderValue = quantity * price;
+      const orderValue = adjustedQuantity * price;
 
       if (orderValue > maxOrderSize) {
         console.log(`⚠️  Order size ${orderValue} exceeds max ${maxOrderSize}. Scaling down.`);
-        quantity = Math.floor((maxOrderSize / price) * 0.95);
+        // Recalculate with max size
+        const newQty = Math.floor((maxOrderSize / price) * 0.95);
+        return this.executeLiveOrder(symbol, side, newQty, price);
       }
 
       if (this.dailyTradeCount >= this.maxDailyTrades) {
@@ -190,12 +263,12 @@ Current safety settings:
       const adjustedPrice = side === 'BUY' ? price * 0.99 : price * 1.01; // Give 1% buffer
 
       console.log(
-        `📍 [${symbol}] ${side} ${quantity} @ £${adjustedPrice.toFixed(4)} (£${(quantity * adjustedPrice).toFixed(2)} value)`
+        `📍 [${symbol}] ${side} ${adjustedQuantity} @ £${adjustedPrice.toFixed(4)} (£${(adjustedQuantity * adjustedPrice).toFixed(2)} value)`
       );
 
       // REAL ORDER EXECUTION - placing actual trades on live Binance
       console.log(`🔥 [REAL TRADE] Placing MARKET order on Binance for ${symbol}...`);
-      console.log(`   Side: ${side}, Quantity: ${quantity.toFixed(8)}`);
+      console.log(`   Side: ${side}, Quantity: ${adjustedQuantity}`);
       
       try {
         // Use MARKET orders for immediate execution (simpler than LIMIT)
@@ -203,7 +276,7 @@ Current safety settings:
           symbol,
           side,
           type: 'MARKET',
-          quantity: Number(quantity.toFixed(8)), // Round to 8 decimals
+          quantity: adjustedQuantity,
         });
 
         this.dailyTradeCount++;
@@ -245,9 +318,12 @@ Current safety settings:
   createHive(generation: number, balance: number, agentCount: number): Hive {
     const hiveId = `live-hive-${this.nextHiveId++}`;
     const agents: Agent[] = [];
-    const balancePerAgent = balance / agentCount;
+    
+    // For small accounts, use fewer agents to maintain minimum order sizes
+    const effectiveAgentCount = balance < 20 ? 1 : agentCount;
+    const balancePerAgent = balance / effectiveAgentCount;
 
-    for (let i = 0; i < agentCount; i++) {
+    for (let i = 0; i < effectiveAgentCount; i++) {
       agents.push(this.createAgent(hiveId, balancePerAgent));
     }
 
@@ -290,7 +366,7 @@ Current safety settings:
       }
 
       // Minimum order values for Binance (in USDT equivalent or base asset)
-      const MIN_ORDER_VALUE_USDT = 10; // Binance minimum is ~$10
+      const MIN_ORDER_VALUE_USDT = 5.5; // $5-6 is typical Binance minimum notional
       
       if (quantity < 0.001) {
         console.log(`⏭️  Skipping ${symbol}: quantity ${quantity.toFixed(8)} too small (min 0.001)`);

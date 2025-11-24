@@ -103,3 +103,70 @@ export interface ChatStreamChunk {
   text: string;
   sources?: GroundingSource[];
 }
+
+// War Room Brief Types
+export interface FieldIntelligence {
+  averageLighthouseIntensity: number;
+  coherenceBursts: number;
+  entropyTrend: 'rising' | 'falling' | 'stable';
+  peakCoherenceTime: string;
+  peakCoherenceValue: number;
+  fieldMood: 'compressed spring' | 'directional flow' | 'chaotic chop' | 'crystalline order';
+}
+
+export interface EngineActivity {
+  signalsGenerated: number;
+  signalsExecuted: number;
+  killSwitchEvents: number;
+  killSwitchDuration: number; // minutes
+  rateLimitEvents: number;
+  dataLatencySpikes: number;
+}
+
+export interface RiskAssessment {
+  drawdownStatus: 'within limits' | 'approaching threshold' | 'exceeded threshold';
+  volatilityLevel: 'low' | 'medium' | 'high' | 'extreme';
+  recommendations: string[];
+}
+
+export interface TradeBreakdown {
+  wins: number;
+  losses: number;
+  averageRR: number;
+  biggestWinner: { pair: string; pnl: number };
+  biggestLoser: { pair: string; pnl: number };
+  topPairs: Array<{ pair: string; pnl: number; trades: number }>;
+}
+
+export interface WarRoomBrief {
+  // Header
+  date: string;
+  user: string;
+  botName: string;
+  fieldStatus: 'Calm' | 'Compressed' | 'Volatile' | 'Coherent';
+  
+  // Tactical Summary
+  netPnL: number;
+  netPnLPercent: number;
+  totalTrades: number;
+  maxDrawdown: number;
+  regime: 'Trending' | 'Choppy' | 'Range-bound';
+  marketBias: 'bullish' | 'bearish' | 'neutral';
+  coherenceLevel: 'low' | 'medium' | 'high';
+  
+  // Field Intelligence
+  fieldIntelligence: FieldIntelligence;
+  
+  // Engine Activity
+  engineActivity: EngineActivity;
+  
+  // Performance Breakdown
+  tradeBreakdown: TradeBreakdown;
+  
+  // Risk & Recommendations
+  riskAssessment: RiskAssessment;
+  
+  // Closing
+  hiveStatus: 'online' | 'degraded' | 'offline';
+  closingMessage: string;
+}
